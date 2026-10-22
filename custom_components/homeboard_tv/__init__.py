@@ -3,7 +3,7 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
-from .const import DOMAIN
+from .const import DOMAIN, migrate_idle_apps
 from .controller import Controller
 from .frontend import async_setup_frontend
 
@@ -32,6 +32,12 @@ async def async_setup(hass: HomeAssistant, config):
     return True
 
 async def async_setup_entry(hass, entry):
+    # Do this before attaching the reload listener so upgrades load just once.
+    values = entry.options or entry.data
+    migrated = migrate_idle_apps(values)
+    if migrated != values:
+        field = "options" if entry.options else "data"
+        hass.config_entries.async_update_entry(entry, **{field: migrated})
     controller = Controller(hass, entry)
     hass.data[DOMAIN][entry.entry_id] = controller
     await hass.config_entries.async_forward_entry_setups(entry, ["switch"])

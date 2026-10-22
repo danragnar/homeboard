@@ -23,6 +23,7 @@ load_module('homeboard_test.policy', 'policy.py')
 core, event, exceptions = ModuleType('homeassistant.core'), ModuleType('homeassistant.helpers.event'), ModuleType('homeassistant.exceptions')
 core.callback = lambda f: f
 exceptions.ServiceValidationError = ValueError
+exceptions.HomeAssistantError = RuntimeError
 class Timer:
     def __init__(self, delay, callback): self.delay, self.callback, self.cancelled = delay, callback, False
     def cancel(self): self.cancelled = True
@@ -96,6 +97,50 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
             with self.assertRaises(ValueError): await self.controller.launch('netflix://')
         self.assertEqual(self.controller.suspended_until,0)
+    async def test_stale_dashboard_quits_before_recasting(self):
+        self.controller.config["power_entity"]="media_player.screen"
+        self.states["media_player.screen"]=SimpleNamespace(state="on",attributes={})
+        self.states['media_player.cast'].state='playing'
+        self.states['media_player.cast'].attributes={'app_name':'Home Assistant Lovelace'}
+        original=self.hass.services.async_call
+        async def call(domain,service,*args,**kwargs):
+            await original(domain,service,*args,**kwargs)
+            if (domain,service)==('media_player','turn_off'):
+                self.states['media_player.cast'].state='off'
+                self.states['media_player.cast'].attributes={}
+        self.hass.services.async_call=call
+        await self.controller.cast()
+        self.assertEqual([c[0][:2] for c in self.hass.services.calls],[('media_player','turn_off'),('cast','show_lovelace_view')])
+    async def test_app_opening_during_receiver_reset_prevents_recast(self):
+        self.controller.config["power_entity"]="media_player.screen"
+        self.states["media_player.screen"]=SimpleNamespace(state="on",attributes={})
+        self.states['media_player.cast'].state='playing'
+        self.states['media_player.cast'].attributes={'app_name':'Home Assistant Lovelace'}
+        original=self.hass.services.async_call
+        async def call(domain,service,*args,**kwargs):
+            await original(domain,service,*args,**kwargs)
+            self.states['media_player.cast'].state='off'
+            self.states['media_player.cast'].attributes={}
+            self.states['remote.tv'].attributes={'current_activity':'netflix'}
+        self.hass.services.async_call=call
+        await self.controller.cast()
+        self.assertEqual([c[0][:2] for c in self.hass.services.calls],[('media_player','turn_off')])
+    async def test_receiver_reset_timeout_records_error_and_unsubscribes(self):
+        self.controller.config["power_entity"]="media_player.screen"
+        self.states["media_player.screen"]=SimpleNamespace(state="on",attributes={})
+        self.states['media_player.cast'].state='playing'
+        self.states['media_player.cast'].attributes={'app_name':'Home Assistant Lovelace'}
+        unsubscribed=[]
+        async def timeout(awaitable, timeout):
+            self.assertEqual(timeout,10)
+            awaitable.close()
+            raise TimeoutError()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}), patch.object(controller_module,'async_track_state_change_event',return_value=lambda: unsubscribed.append(True)), patch.object(controller_module.asyncio,'wait_for',side_effect=timeout):
+            await self.controller.cast()
+        self.assertEqual(unsubscribed,[True])
+        self.assertEqual(self.controller.last_error,'The stale Home Assistant Cast receiver did not close')
+        self.assertEqual([c[0][:2] for c in self.hass.services.calls],[('media_player','turn_off')])
+        self.assertGreater(self.hass.timers[-1].delay,298)
     async def test_user_context_is_preserved(self):
         context=object()
         await self.controller.cast(context)

@@ -1,5 +1,13 @@
 # Changes
 
+## 0.2.1
+
+- Recognize current Google TV launcher and screensaver IDs; migrate only the previous default allowlist.
+- Treat a Cast receiver in `off` as idle only with independent screen power and foreground confirmation.
+- Close stale Home Assistant Cast sessions before relaunching the configured dashboard, with a bounded wait and fresh safety checks.
+- Preserve media playback, screen power, app grace and custom allowlist protections.
+- Document receiver connection errors separately from successful dispatch.
+
 ## 0.2.0
 
 - One HACS integration now contains the casting service and frontend card.

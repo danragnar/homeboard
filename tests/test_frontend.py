@@ -33,7 +33,7 @@ class FrontendTests(unittest.IsolatedAsyncioTestCase):
     async def test_first_install_registers_bundled_assets_and_module(self):
         resources=Resources();hass,paths=self.fake_hass(resources)
         await module.async_setup_frontend(hass)
-        self.assertEqual(paths[0].url_path,'/homeboard_tv/0.2.0')
+        self.assertEqual(paths[0].url_path,f'/homeboard_tv/{module.VERSION}')
         self.assertTrue((Path(paths[0].path)/'model.mjs').is_file())
         self.assertEqual(resources.writes,[('create',{'res_type':'module','url':module.RESOURCE_URL})])
     async def test_existing_current_resource_is_unchanged(self):

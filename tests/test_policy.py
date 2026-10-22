@@ -17,7 +17,7 @@ class IdlePolicyTests(unittest.TestCase):
     def test_idle_launcher_ready(self):
         self.assertEqual(reason(self.config,self.states),"ready")
     def test_playback_and_pause_block_casting(self):
-        for state in ["playing","paused","buffering","off","unknown","unavailable","standby","on"]:
+        for state in ["playing","paused","buffering","unknown","unavailable","standby","on"]:
             self.states["media_player.cast"]=Snapshot(state)
             self.assertNotEqual(reason(self.config,self.states),"ready",state)
     def test_native_app_browsing_blocks_even_when_cast_idle(self):
@@ -44,7 +44,51 @@ class IdlePolicyTests(unittest.TestCase):
         self.assertEqual(reason(self.config,self.states),"ready")
     def test_dashboard_does_not_recast(self):
         self.states["media_player.cast"]=Snapshot("idle",{"app_name":"Home Assistant Lovelace"})
+        self.states["remote.tv"]=Snapshot("on",{"current_activity":"cast_receiver"})
         self.assertEqual(reason(self.config,self.states),"dashboard visible")
+    def test_stale_own_dashboard_can_return_from_known_idle_launcher(self):
+        for state in ["idle","playing","paused","buffering","on"]:
+            self.states["media_player.cast"]=Snapshot(state,{"app_name":"Home Assistant Lovelace"})
+            self.assertEqual(reason(self.config,self.states),"ready",state)
+    def test_other_cast_media_never_bypasses_playback_guard(self):
+        for app in ["Netflix","YouTube",None]:
+            for state in ["playing","paused","buffering"]:
+                self.states["media_player.cast"]=Snapshot(state,{"app_name":app})
+                self.assertEqual(reason(self.config,self.states),"media in use")
+    def test_stale_dashboard_still_respects_power_guard_and_grace(self):
+        self.states["media_player.cast"]=Snapshot("playing",{"app_name":"Home Assistant Lovelace"})
+        self.states["media_player.screen"]=Snapshot("off")
+        self.assertEqual(reason(self.config,self.states),"screen off")
+        self.states["media_player.screen"]=Snapshot("on")
+        self.config["idle_guard"]="binary_sensor.idle"
+        self.states["binary_sensor.idle"]=Snapshot("off")
+        self.assertEqual(reason(self.config,self.states),"idle guard closed")
+        self.assertEqual(reason(self.config,self.states,suspended=True),"app grace period")
+    def test_unknown_foreground_does_not_restart_dashboard(self):
+        self.states["media_player.cast"]=Snapshot("playing",{"app_name":"Home Assistant Lovelace"})
+        for foreground in [None,"netflix"]:
+            self.states["remote.tv"]=Snapshot("on",{"current_activity":foreground})
+            self.assertEqual(reason(self.config,self.states),"dashboard visible")
+    def test_stale_dashboard_needs_real_power_signal_for_reset(self):
+        self.states["media_player.cast"]=Snapshot("playing",{"app_name":"Home Assistant Lovelace"})
+        self.config.pop("power_entity")
+        self.assertEqual(reason(self.config,self.states),"dashboard visible")
+    def test_cast_off_can_mean_idle_receiver_with_independent_power(self):
+        self.states["media_player.cast"]=Snapshot("off")
+        self.assertEqual(reason(self.config,self.states),"ready")
+        self.config.pop("power_entity")
+        self.assertEqual(reason(self.config,self.states),"TV offline")
+    def test_cast_off_needs_both_power_and_idle_foreground(self):
+        self.states["media_player.cast"]=Snapshot("off")
+        self.states["remote.tv"]=Snapshot("on",{"current_activity":"netflix"})
+        self.assertEqual(reason(self.config,self.states),"TV offline")
+        self.states["remote.tv"]=Snapshot("on",{"current_activity":"launcher"})
+        self.states["media_player.screen"]=Snapshot("off")
+        self.assertEqual(reason(self.config,self.states),"screen off")
+    def test_off_script_transport_is_not_an_idle_receiver(self):
+        self.config["mode"]="script"
+        self.states["media_player.cast"]=Snapshot("off")
+        self.assertEqual(reason(self.config,self.states),"TV offline")
     def test_switch_and_grace_block(self):
         self.assertEqual(reason(self.config,self.states,enabled=False),"disabled")
         self.assertEqual(reason(self.config,self.states,suspended=True),"app grace period")

@@ -29,7 +29,7 @@ Once the repository is published:
 If you manage **resources** in YAML, add the resource below to your existing `lovelace.resources` list instead. Homeboard logs a reminder and leaves YAML resource configuration under your control:
 
 ```yaml
-- url: /homeboard_tv/0.2.0/homeboard-tv-card.js
+- url: /homeboard_tv/0.2.1/homeboard-tv-card.js
   type: module
 ```
 
@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.2.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.2.1`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.2.0.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.2.1.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -76,7 +76,7 @@ Pair both native integrations:
 - **Google Cast:** use its `media_player` as `playback_entity`. It supplies actual Cast playback states.
 - **Android TV Remote:** use its `remote` entity as `activity_entity` and `remote_entity`. Its `current_activity` attribute identifies the foreground app. Android TV Remote's media player alone does **not** reliably report playback.
 
-Inspect the remote's `current_activity` while on the home launcher. Put those exact IDs in `idle_apps`, comma separated. The two supplied Google launcher IDs are starting points, not a guarantee for all brands. App menus, Netflix, paused media, missing activity information, and unavailable entities all block automatic casting. **Never include streaming apps in the idle app list.**
+Inspect the remote's `current_activity` while on the home launcher. Put those exact IDs in `idle_apps`, comma separated. The supplied IDs include Google TV launcher (`com.google.android.apps.tv.launcherx`) and screensaver (`com.google.android.apps.tv.dreamx`), alongside older launchers. Verify them for your device. Upgrades expand the previous shipped defaults automatically; customized lists are preserved. App menus, Netflix, paused media, missing activity information, and unavailable entities all block automatic casting. **Never include streaming apps in the idle app list.**
 
 If the Cast receiver remains online with the TV powered off, set `power_entity` to an entity that reflects the actual screen's power. This avoids using an always-on Chromecast to wake an off screen through HDMI-CEC. A physical TV can only be treated as offline if you supply a signal that actually reports that condition.
 
@@ -100,14 +100,16 @@ The LG browser needs its own authenticated HA session. Sign in on the TV using a
 Defaults: **45 seconds stable idle**, **5 minutes between automatic attempts**, **10 minutes grace after app launch**.
 
 1. Listen for changes to the configured playback, screen power, foreground app, and idle guard entities.
-2. Require an online screen with `idle` playback. `on` is accepted only with an explicit guard. `playing`, `paused`, and `buffering` block casting.
+2. Require an online screen with `idle` playback. `on` is accepted only with an explicit guard. A Cast entity in `off` can mean no receiver app: it is accepted only when a separate screen power entity is online and the foreground app is an allowed launcher/screensaver. Other offline states block casting. Media playback (`playing`, `paused`, or `buffering`) blocks casting, except for a stale Home Assistant receiver as described below.
 3. Require every configured guard to agree: allowed launcher app and/or an idle guard in `on`. Missing or unknown signals block casting.
 4. Wait for the stable idle delay. Unrelated attribute updates do not postpone it. Busy/offline events cancel it.
 5. Recheck all conditions immediately before dispatching the configured view or script.
-6. Do not recast when the receiver reports the configured dashboard app name. Inspect the Cast entity's `app_name` and override `dashboard_app` if needed.
+6. Keep a visible dashboard session. If the Cast entity still reports the configured dashboard app while an independent foreground entity reports an allowed launcher/screensaver and the screen power entity is online, close that stale HA receiver, wait up to 10 seconds for it to close, recheck all guards, then cast the configured view. This only closes the Cast receiver app; it does not turn off the physical screen. Inspect the Cast entity's `app_name` and override `dashboard_app` if needed.
 7. Failed or still-idle dispatches can retry after the cooldown. The switch exposes the last error; this is an attempt interval, not an infinite tight retry loop.
 
 App launches cancel pending casts, start the grace period, and use the configured Android TV remote. A timer reevaluates when grace expires even without another entity event. Foreground detection continues protecting app browsing after grace expires. Turning the auto-dashboard switch off persists across HA restarts.
+
+A successful Cast action means the request was dispatched; it does not prove the TV connected or rendered. If the TV shows “Not connected” or a WebSocket error, check the HTTPS external URL, DNS, certificate and reverse-proxy WebSocket forwarding. A fresh cast may clear a transient connection failure. Avoid changing network settings if the same URL works on retry.
 
 An LG opening script is dispatched through `script.turn_on`; the integration reports dispatch errors, while errors inside the running script are visible in HA's script traces. It cannot prove a browser rendered the dashboard.
 
@@ -172,7 +174,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.2.0.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.2.1.zip and homeboard_tv.zip
 ```
 
 The preview opens a true 16:9 TV canvas even in a narrow app pane, with selectable 1080p, 720p, and responsive views. The preview always identifies sample data, uses a fixed sample day, and simulates every action. It never connects to HA or controls devices. Runtime assets use no CDN, external fonts, analytics, or front-end framework.

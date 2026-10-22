@@ -81,6 +81,36 @@ class Controller:
         self.pending = None
         self.task = self.hass.async_create_task(self.cast())
 
+    async def reset_stale_dashboard(self, context):
+        """Quit only a stale HA receiver, then wait for its actual state change."""
+        entity_id = self.config["playback_entity"]
+        own_app = self.config.get("dashboard_app", "Home Assistant Lovelace")
+        state = self.hass.states.get(entity_id)
+        if not state or state.attributes.get("app_name") != own_app:
+            return
+        cleared = asyncio.Event()
+
+        @callback
+        def changed(_):
+            current = self.hass.states.get(entity_id)
+            if current and current.attributes.get("app_name") != own_app:
+                cleared.set()
+
+        unsubscribe = async_track_state_change_event(self.hass, [entity_id], changed)
+        try:
+            # Native Cast turn_off calls quit_app, not the LG/Android power entity.
+            await self.hass.services.async_call("media_player", "turn_off", {
+                "entity_id": entity_id,
+            }, blocking=True, context=context)
+            changed(None)
+            try:
+                await asyncio.wait_for(cleared.wait(), timeout=10)
+            except TimeoutError as exc:
+                from homeassistant.exceptions import HomeAssistantError
+                raise HomeAssistantError("The stale Home Assistant Cast receiver did not close") from exc
+        finally:
+            unsubscribe()
+
     async def cast(self, context=None, raise_errors=False):
         # Always re-check at dispatch: media may have started during the delay.
         if self.closed or self.busy or self.reason != "ready":
@@ -92,6 +122,9 @@ class Controller:
         try:
             async with self.dispatch_lock:
                 if self.config["mode"] == "cast":
+                    await self.reset_stale_dashboard(context)
+                    if self.closed or self.reason != "ready":
+                        return  # Power/app may have changed while closing the receiver.
                     await self.hass.services.async_call("cast", "show_lovelace_view", {
                         "entity_id": self.config["playback_entity"],
                         "dashboard_path": self.config.get("dashboard_path", "homeboard-home"),
