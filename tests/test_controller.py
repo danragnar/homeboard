@@ -146,4 +146,47 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         await self.controller.cast(context)
         self.assertIs(self.hass.services.calls[0][1]['context'],context)
 
+    async def start_unconfirmed_receiver(self):
+        self.controller.config['power_entity']='media_player.screen'
+        self.states['media_player.screen']=SimpleNamespace(state='on',attributes={})
+        original=self.hass.services.async_call
+        async def call(*args,**kwargs):
+            await original(*args,**kwargs)
+            self.states['media_player.cast']=SimpleNamespace(state='playing',attributes={'app_name':'Home Assistant Lovelace'})
+            self.states['remote.tv'].attributes={'current_activity':'com.google.android.apps.mediashell'}
+        self.hass.services.async_call=call
+        await self.controller.cast()
+
+    async def test_missing_title_retries_existing_receiver_once_then_stops(self):
+        await self.start_unconfirmed_receiver()
+        self.assertGreater(self.hass.timers[-1].delay,44)
+        self.hass.timers[-1].callback(None)
+        await self.controller.task
+        self.assertEqual(len(self.hass.services.calls),2)
+        self.assertEqual([c[0][:2] for c in self.hass.services.calls],[('cast','show_lovelace_view')]*2)
+        self.controller.last_attempt-=46
+        self.hass.timers[-1].callback(None)
+        self.assertFalse(self.controller.awaiting_dashboard)
+        self.assertIn('no dashboard title',self.controller.last_error)
+        self.controller.evaluate()
+        self.assertEqual(len(self.hass.services.calls),2)
+
+    async def test_title_cancels_connection_retry(self):
+        await self.start_unconfirmed_receiver()
+        timer=self.hass.timers[-1]
+        self.states['media_player.cast'].attributes['media_title']='Home: Overview'
+        self.controller.evaluate()
+        self.assertTrue(timer.cancelled)
+        self.assertFalse(self.controller.awaiting_dashboard)
+        self.assertEqual(self.controller.reason,'dashboard reported')
+        self.assertEqual(len(self.hass.services.calls),1)
+
+    async def test_user_opens_app_before_retry(self):
+        await self.start_unconfirmed_receiver()
+        self.states['remote.tv'].attributes={'current_activity':'netflix'}
+        self.controller.evaluate()
+        await self.controller.retry_connection()
+        self.assertFalse(self.controller.awaiting_dashboard)
+        self.assertEqual(len(self.hass.services.calls),1)
+
 if __name__=='__main__': unittest.main()

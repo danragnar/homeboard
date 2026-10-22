@@ -10,7 +10,7 @@
           "mode": "Dashboard transport",
           "playback_entity": "Playback entity (use Google Cast for Google TV)",
           "power_entity": "Screen power entity (recommended for always-on receivers)",
-          "activity_entity": "Foreground app entity",
+          "activity_entity": "Foreground app entity (Google TV: select the Remote, not Media player)",
           "activity_attribute": "Foreground app attribute",
           "idle_apps": "Allowed idle app IDs (comma separated)",
           "idle_guard": "Additional safe-to-cast guard (on = safe)",
@@ -21,7 +21,10 @@
           "dashboard_script": "Dashboard opening script (script transport)",
           "idle_seconds": "Stable idle delay (seconds)",
           "cooldown_seconds": "Minimum dispatch interval (seconds)",
-          "app_grace_seconds": "Grace after launching an app (seconds)"
+          "app_grace_seconds": "Grace after launching an app (seconds)",
+          "cast_retry_seconds": "Cast connection retry delay (seconds)",
+          "cast_retry_limit": "Cast connection retries (0 disables)",
+          "cast_receiver_apps": "Cast receiver foreground app IDs (comma separated)"
         }
       }
     },
@@ -40,7 +43,7 @@
           "mode": "Dashboard transport",
           "playback_entity": "Playback entity (use Google Cast for Google TV)",
           "power_entity": "Screen power entity (recommended for always-on receivers)",
-          "activity_entity": "Foreground app entity",
+          "activity_entity": "Foreground app entity (Google TV: select the Remote, not Media player)",
           "activity_attribute": "Foreground app attribute",
           "idle_apps": "Allowed idle app IDs (comma separated)",
           "idle_guard": "Additional safe-to-cast guard (on = safe)",
@@ -51,7 +54,10 @@
           "dashboard_script": "Dashboard opening script (script transport)",
           "idle_seconds": "Stable idle delay (seconds)",
           "cooldown_seconds": "Minimum dispatch interval (seconds)",
-          "app_grace_seconds": "Grace after launching an app (seconds)"
+          "app_grace_seconds": "Grace after launching an app (seconds)",
+          "cast_retry_seconds": "Cast connection retry delay (seconds)",
+          "cast_retry_limit": "Cast connection retries (0 disables)",
+          "cast_receiver_apps": "Cast receiver foreground app IDs (comma separated)"
         }
       }
     },

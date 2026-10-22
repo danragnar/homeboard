@@ -1,6 +1,6 @@
 """Shared configuration for Homeboard TV."""
 DOMAIN = "homeboard_tv"
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 LEGACY_IDLE_APPS = "com.google.android.apps.tv.launcher,com.google.android.tvlauncher"
 DEFAULTS = {
     "name": "Living room",
@@ -12,6 +12,9 @@ DEFAULTS = {
     "app_grace_seconds": 600,
     "idle_apps": "com.google.android.apps.tv.launcher,com.google.android.tvlauncher,com.google.android.apps.tv.launcherx,com.google.android.apps.tv.dreamx",
     "dashboard_app": "Home Assistant Lovelace",
+    "cast_retry_seconds": 45,
+    "cast_retry_limit": 1,
+    "cast_receiver_apps": "com.google.android.apps.mediashell",
 }
 
 def migrate_idle_apps(values):

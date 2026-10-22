@@ -4,7 +4,7 @@ import logging
 from time import monotonic
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
-from .policy import Snapshot, idle_reason
+from .policy import Snapshot, idle_reason, connection_retry_reason
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,11 +23,19 @@ class Controller:
         self.busy = False
         self.closed = False
         self.dispatch_lock = asyncio.Lock()
+        self.awaiting_dashboard = False
+        self.connection_retries = 0
+
+    def snapshots(self):
+        return {key: Snapshot(state.state, state.attributes) for key in self.ids if (state := self.hass.states.get(key))}
 
     @property
     def reason(self):
-        states = {key: Snapshot(state.state, state.attributes) for key in self.ids if (state := self.hass.states.get(key))}
-        return idle_reason(self.config, states, self.enabled, monotonic() < self.suspended_until)
+        return idle_reason(self.config, self.snapshots(), self.enabled, monotonic() < self.suspended_until)
+
+    @property
+    def retry_reason(self):
+        return connection_retry_reason(self.config, self.snapshots(), self.enabled, monotonic() < self.suspended_until)
 
     @property
     def ids(self):
@@ -59,6 +67,27 @@ class Controller:
             return
         reason = self.reason
         self.notify()
+        if self.awaiting_dashboard and not self.busy:
+            retry_reason = self.retry_reason
+            if retry_reason == "dashboard reported":
+                self.awaiting_dashboard = False
+                self.cancel_timer()
+            elif retry_reason == "ready":
+                if self.connection_retries < self.config.get("cast_retry_limit", 1):
+                    if not self.pending:
+                        delay = max(0, self.last_attempt + self.config.get("cast_retry_seconds", 45) - monotonic())
+                        self.pending = async_call_later(self.hass, delay, self.wake_retry)
+                elif not self.pending:
+                    remaining = self.last_attempt + self.config.get("cast_retry_seconds", 45) - monotonic()
+                    if remaining > 0:
+                        self.pending = async_call_later(self.hass, remaining, self.wake)
+                    else:
+                        self.last_error = "Cast receiver opened but no dashboard title was reported after connection retries"
+                        self.awaiting_dashboard = False
+                        self.notify()
+                return
+            elif retry_reason != "receiver changed":
+                self.awaiting_dashboard = False
         if reason != "ready" or self.busy:
             self.cancel_timer()
             # Wake once when app grace ends, even if no entity changes meanwhile.
@@ -80,6 +109,39 @@ class Controller:
     def wake_cast(self, _):
         self.pending = None
         self.task = self.hass.async_create_task(self.cast())
+
+    @callback
+    def wake_retry(self, _):
+        self.pending = None
+        self.task = self.hass.async_create_task(self.retry_connection())
+
+    async def retry_connection(self):
+        if self.closed or self.busy or not self.awaiting_dashboard or self.retry_reason != "ready":
+            return
+        self.busy = True
+        self.connection_retries += 1
+        self.last_attempt = monotonic()
+        try:
+            async with self.dispatch_lock:
+                # Reconnect the existing receiver; do not quit or power-cycle it.
+                if self.retry_reason == "ready":
+                    await self.show_view()
+        except Exception as exc:
+            self.last_error = str(exc)
+            _LOGGER.warning("Cast connection retry failed for %s: %s", self.entry.title, exc)
+        finally:
+            self.busy = False
+            # Allow the final request time to report its title before giving up.
+            if not self.closed and self.retry_reason == "ready":
+                self.pending = async_call_later(self.hass, self.config.get("cast_retry_seconds", 45), self.wake)
+            self.evaluate()
+
+    async def show_view(self, context=None):
+        await self.hass.services.async_call("cast", "show_lovelace_view", {
+            "entity_id": self.config["playback_entity"],
+            "dashboard_path": self.config.get("dashboard_path", "homeboard-home"),
+            "view_path": self.config.get("view_path", "overview"),
+        }, blocking=True, context=context)
 
     async def reset_stale_dashboard(self, context):
         """Quit only a stale HA receiver, then wait for its actual state change."""
@@ -119,17 +181,16 @@ class Controller:
         self.busy = True
         self.last_attempt = monotonic()
         self.last_error = None
+        self.awaiting_dashboard = False
         try:
             async with self.dispatch_lock:
                 if self.config["mode"] == "cast":
                     await self.reset_stale_dashboard(context)
                     if self.closed or self.reason != "ready":
                         return  # Power/app may have changed while closing the receiver.
-                    await self.hass.services.async_call("cast", "show_lovelace_view", {
-                        "entity_id": self.config["playback_entity"],
-                        "dashboard_path": self.config.get("dashboard_path", "homeboard-home"),
-                        "view_path": self.config.get("view_path", "overview"),
-                    }, blocking=True, context=context)
+                    self.awaiting_dashboard = True
+                    self.connection_retries = 0
+                    await self.show_view(context)
                 else:
                     await self.hass.services.async_call("script", "turn_on", {
                         "entity_id": self.config["dashboard_script"],
@@ -149,6 +210,7 @@ class Controller:
         if not remote:
             raise ServiceValidationError("Configure an Android TV remote entity for this TV first")
         self.suspended_until = monotonic() + self.config.get("app_grace_seconds", 600)
+        self.awaiting_dashboard = False
         self.cancel_timer()
         self.evaluate()
         async with self.dispatch_lock:

@@ -1,5 +1,12 @@
 # Changes
 
+## 0.2.3
+
+- Distinguish a launched Cast receiver from a dashboard title reported by the receiver.
+- Retry unconfirmed Homeboard-launched Cast connections with configurable delay and bounded attempts, without closing the receiver.
+- Require independent power, Cast foreground and guard confirmation before recovery; stop for app changes and screen-off.
+- Clarify the Google TV Remote selector and expose selected entity IDs and retry diagnostics.
+
 ## 0.2.2
 
 - Set card text alignment explicitly so the Cast receiver cannot center dashboard labels, readings and descriptions.

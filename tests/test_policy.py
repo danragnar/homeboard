@@ -45,7 +45,7 @@ class IdlePolicyTests(unittest.TestCase):
     def test_dashboard_does_not_recast(self):
         self.states["media_player.cast"]=Snapshot("idle",{"app_name":"Home Assistant Lovelace"})
         self.states["remote.tv"]=Snapshot("on",{"current_activity":"cast_receiver"})
-        self.assertEqual(reason(self.config,self.states),"dashboard visible")
+        self.assertEqual(reason(self.config,self.states),"receiver active; dashboard unconfirmed")
     def test_stale_own_dashboard_can_return_from_known_idle_launcher(self):
         for state in ["idle","playing","paused","buffering","on"]:
             self.states["media_player.cast"]=Snapshot(state,{"app_name":"Home Assistant Lovelace"})
@@ -68,11 +68,11 @@ class IdlePolicyTests(unittest.TestCase):
         self.states["media_player.cast"]=Snapshot("playing",{"app_name":"Home Assistant Lovelace"})
         for foreground in [None,"netflix"]:
             self.states["remote.tv"]=Snapshot("on",{"current_activity":foreground})
-            self.assertEqual(reason(self.config,self.states),"dashboard visible")
+            self.assertEqual(reason(self.config,self.states),"receiver active; dashboard unconfirmed")
     def test_stale_dashboard_needs_real_power_signal_for_reset(self):
         self.states["media_player.cast"]=Snapshot("playing",{"app_name":"Home Assistant Lovelace"})
         self.config.pop("power_entity")
-        self.assertEqual(reason(self.config,self.states),"dashboard visible")
+        self.assertEqual(reason(self.config,self.states),"receiver active; dashboard unconfirmed")
     def test_cast_off_can_mean_idle_receiver_with_independent_power(self):
         self.states["media_player.cast"]=Snapshot("off")
         self.assertEqual(reason(self.config,self.states),"ready")
@@ -95,5 +95,25 @@ class IdlePolicyTests(unittest.TestCase):
     def test_no_guard_is_never_ready(self):
         self.config.pop("activity_entity")
         self.assertEqual(reason(self.config,self.states),"idle detection not configured")
+    def test_untitled_receiver_can_retry_only_in_cast_foreground(self):
+        self.states['media_player.cast']=Snapshot('playing',{'app_name':'Home Assistant Lovelace'})
+        self.states['remote.tv']=Snapshot('on',{'current_activity':'com.google.android.apps.mediashell'})
+        self.assertEqual(policy.connection_retry_reason(self.config,self.states),'ready')
+        for app in ['netflix','launcher',None]:
+            self.states['remote.tv']=Snapshot('on',{'current_activity':app})
+            self.assertNotEqual(policy.connection_retry_reason(self.config,self.states),'ready')
+    def test_retry_stops_on_title_and_requires_online_independent_signals(self):
+        self.states['media_player.cast']=Snapshot('playing',{'app_name':'Home Assistant Lovelace','media_title':'Home: Overview'})
+        self.assertEqual(reason(self.config,self.states),'ready')  # launcher means stale session
+        self.assertEqual(policy.connection_retry_reason(self.config,self.states),'dashboard reported')
+        self.states['media_player.cast']=Snapshot('playing',{'app_name':'Home Assistant Lovelace'})
+        self.states['remote.tv']=Snapshot('on',{'current_activity':'com.google.android.apps.mediashell'})
+        self.assertNotEqual(policy.connection_retry_reason(self.config,self.states,enabled=False),'ready')
+        self.assertNotEqual(policy.connection_retry_reason(self.config,self.states,suspended=True),'ready')
+        self.states['media_player.screen']=Snapshot('off')
+        self.assertNotEqual(policy.connection_retry_reason(self.config,self.states),'ready')
+        self.states['media_player.screen']=Snapshot('on')
+        self.config['idle_guard']='binary_sensor.idle'
+        self.assertNotEqual(policy.connection_retry_reason(self.config,self.states),'ready')
 
 if __name__ == '__main__': unittest.main()

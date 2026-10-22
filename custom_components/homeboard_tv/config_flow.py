@@ -28,6 +28,9 @@ def schema(values):
         field("idle_seconds"): vol.All(vol.Coerce(int), vol.Range(min=5, max=3600)),
         field("cooldown_seconds"): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
         field("app_grace_seconds"): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
+        field("cast_retry_seconds"): vol.All(vol.Coerce(int), vol.Range(min=35, max=600)),
+        field("cast_retry_limit"): vol.All(vol.Coerce(int), vol.Range(min=0, max=3)),
+        field("cast_receiver_apps"): str,
     })
 
 def errors(data):

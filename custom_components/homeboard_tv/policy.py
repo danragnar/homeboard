@@ -39,7 +39,7 @@ def idle_reason(config: dict, states: Mapping[str, Snapshot], enabled=True, susp
     # that an explicitly allowed launcher/screensaver is in the foreground.
     stale_dashboard = config.get("mode", "cast") == "cast" and own_dashboard and known_idle_activity and bool(power)
     if own_dashboard and not stale_dashboard:
-        return "dashboard visible"
+        return "dashboard reported" if playback.attributes.get("media_title") else "receiver active; dashboard unconfirmed"
     if playback.state in {"playing", "paused", "buffering"} and not stale_dashboard:
         return "media in use"
     # 'on' is allowed only with an explicit independent idle guard (LG reports 'on').
@@ -56,3 +56,18 @@ def idle_reason(config: dict, states: Mapping[str, Snapshot], enabled=True, susp
     if not activity_id and not guard:
         return "idle detection not configured"
     return "ready"
+
+def connection_retry_reason(config, states, enabled=True, suspended=False):
+    """Retry only an untitled HA receiver in a verified Cast foreground app."""
+    playback = states.get(config.get("playback_entity"))
+    if not playback or playback.attributes.get("app_name") != config.get("dashboard_app", "Home Assistant Lovelace"):
+        return "receiver changed"
+    if playback.state in OFFLINE:
+        return "TV offline"
+    if playback.attributes.get("media_title"):
+        return "dashboard reported"
+    if not config.get("power_entity") or not config.get("activity_entity"):
+        return "independent signals required"
+    retry_config = {**config, "idle_apps": config.get("cast_receiver_apps", "com.google.android.apps.mediashell")}
+    retry_states = {**states, config["playback_entity"]: Snapshot("idle")}
+    return idle_reason(retry_config, retry_states, enabled, suspended)
