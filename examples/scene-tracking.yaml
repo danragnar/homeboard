@@ -1,0 +1,13 @@
+# OPTIONAL example. A scene entity records its last activation, not active status.
+# Build helpers from the actual states defining each scene; adjust these targets.
+template:
+  - binary_sensor:
+      - name: Evening scene active
+        unique_id: homeboard_evening_scene_active
+        availability: >-
+          {{ states('light.living_room') not in ['unknown','unavailable']
+             and states('light.kitchen') not in ['unknown','unavailable'] }}
+        state: >-
+          {{ is_state('light.living_room', 'on')
+             and 65 <= (state_attr('light.living_room', 'brightness') | int(-1)) <= 90
+             and is_state('light.kitchen', 'off') }}

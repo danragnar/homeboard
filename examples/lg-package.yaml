@@ -1,0 +1,26 @@
+# OPTIONAL package for LG's native browser. Replace the TV entity, URL, and
+# idle source names with values observed on YOUR TV. Do not assume on=idle.
+# Include via homeassistant.packages, e.g. packages: !include_dir_named packages
+# LG browser support/authentication varies; use an external Cast device if needed.
+template:
+  - binary_sensor:
+      - name: LG dashboard idle
+        unique_id: homeboard_lg_dashboard_idle
+        availability: >-
+          {{ states('media_player.lg_tv') not in ['unknown', 'unavailable'] }}
+        state: >-
+          {{ states('media_player.lg_tv') in ['on', 'idle']
+             and state_attr('media_player.lg_tv', 'source') in ['Home'] }}
+        # Add only sources you have verified are idle, never Netflix/HDMI/browser.
+script:
+  homeboard_open_lg_dashboard:
+    alias: Homeboard · Open LG dashboard
+    mode: single
+    sequence:
+      - action: webostv.command
+        target:
+          entity_id: media_player.lg_tv
+        data:
+          command: system.launcher/open
+          payload:
+            target: https://REPLACE_WITH_YOUR_HA_URL/homeboard-home/overview

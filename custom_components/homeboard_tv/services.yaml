@@ -1,0 +1,26 @@
+show_dashboard:
+  name: Show dashboard
+  description: Show the configured dashboard if the selected screen is safely idle.
+  fields:
+    entry_id:
+      name: Screen configuration
+      required: true
+      selector:
+        config_entry:
+          integration: homeboard_tv
+launch_app:
+  name: Launch Google TV app
+  description: Suspend automatic casting briefly, then launch an activity on the configured Android TV remote.
+  fields:
+    entry_id:
+      name: Screen configuration
+      required: true
+      selector:
+        config_entry:
+          integration: homeboard_tv
+    activity:
+      name: App link or package ID
+      required: true
+      example: "netflix://"
+      selector:
+        text:

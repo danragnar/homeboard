@@ -1,0 +1,34 @@
+# OPTIONAL for the OFFICIAL Nord Pool integration, whose current-price sensor
+# does not include a raw_today attribute. Include as a Home Assistant package.
+# Replace config_entry and area. Use your existing current-price entity if desired.
+# Point the card at sensor.homeboard_electricity_prices with price_attribute: intervals.
+# The action returns currency/MWh: this template converts to currency/kWh.
+# Keep the card price_factor at 1. Add taxes/markup in your own provider logic or
+# use the card factor/offset consistently for both history and current prices.
+template:
+  - triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        minutes: /30
+    actions:
+      - action: nordpool.get_prices_for_date
+        data:
+          config_entry: REPLACE_WITH_NORDPOOL_CONFIG_ENTRY_ID
+          date: '{{ now().date() }}'
+          areas:
+            - SE3
+          currency: SEK
+        response_variable: today_prices
+    sensor:
+      - name: Homeboard electricity prices
+        unique_id: homeboard_electricity_prices
+        # No misleading current-price fallback; card reads current interval.
+        state: '{{ now().date().isoformat() }}'
+        attributes:
+          intervals: >-
+            {% set ns = namespace(items=[]) %}
+            {% for row in today_prices.get('SE3', []) %}
+              {% set ns.items = ns.items + [dict(start=row.start, end=row.end, value=row.price / 1000)] %}
+            {% endfor %}
+            {{ ns.items }}

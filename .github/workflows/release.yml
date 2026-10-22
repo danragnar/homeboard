@@ -1,0 +1,30 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify release metadata
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+        run: python scripts/prepare_hacs.py --repository "$SOURCE_REPOSITORY" --check --tag "$RELEASE_TAG"
+      - run: npm run check
+      - run: npm test
+      - run: npm run package
+      - name: Publish release archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" artifacts/homeboard-tv-*.zip artifacts/homeboard_tv.zip --verify-tag --generate-notes

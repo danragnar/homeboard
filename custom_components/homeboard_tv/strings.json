@@ -1,0 +1,64 @@
+{
+  "title": "Homeboard TV",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a screen",
+        "description": "Use a Cast playback entity with an Android TV foreground app entity. For LG script transport, supply an explicit idle guard. Unknown or unavailable signals block casting.",
+        "data": {
+          "name": "Screen name",
+          "mode": "Dashboard transport",
+          "playback_entity": "Playback entity (use Google Cast for Google TV)",
+          "power_entity": "Screen power entity (recommended for always-on receivers)",
+          "activity_entity": "Foreground app entity",
+          "activity_attribute": "Foreground app attribute",
+          "idle_apps": "Allowed idle app IDs (comma separated)",
+          "idle_guard": "Additional safe-to-cast guard (on = safe)",
+          "remote_entity": "Android TV remote for app launching",
+          "dashboard_path": "Dashboard URL path",
+          "view_path": "View URL path",
+          "dashboard_app": "Dashboard app name (prevents recasting)",
+          "dashboard_script": "Dashboard opening script (script transport)",
+          "idle_seconds": "Stable idle delay (seconds)",
+          "cooldown_seconds": "Minimum dispatch interval (seconds)",
+          "app_grace_seconds": "Grace after launching an app (seconds)"
+        }
+      }
+    },
+    "error": {
+      "missing_guard": "Select a foreground app entity or an idle guard. Idle playback alone cannot detect native apps.",
+      "missing_script": "Select a script to open the dashboard.",
+      "missing_path": "Set both the dashboard and view URL paths."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Screen settings",
+        "data": {
+          "name": "Screen name",
+          "mode": "Dashboard transport",
+          "playback_entity": "Playback entity (use Google Cast for Google TV)",
+          "power_entity": "Screen power entity (recommended for always-on receivers)",
+          "activity_entity": "Foreground app entity",
+          "activity_attribute": "Foreground app attribute",
+          "idle_apps": "Allowed idle app IDs (comma separated)",
+          "idle_guard": "Additional safe-to-cast guard (on = safe)",
+          "remote_entity": "Android TV remote for app launching",
+          "dashboard_path": "Dashboard URL path",
+          "view_path": "View URL path",
+          "dashboard_app": "Dashboard app name (prevents recasting)",
+          "dashboard_script": "Dashboard opening script (script transport)",
+          "idle_seconds": "Stable idle delay (seconds)",
+          "cooldown_seconds": "Minimum dispatch interval (seconds)",
+          "app_grace_seconds": "Grace after launching an app (seconds)"
+        }
+      }
+    },
+    "error": {
+      "missing_guard": "Select a foreground app entity or an idle guard. Idle playback alone cannot detect native apps.",
+      "missing_script": "Select a script to open the dashboard.",
+      "missing_path": "Set both the dashboard and view URL paths."
+    }
+  }
+}

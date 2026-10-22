@@ -1,0 +1,17 @@
+# Changes
+
+## 0.2.0
+
+- One HACS integration now contains the casting service and frontend card.
+- Bundled static assets with versioned URLs, automatic UI resource registration and legacy resource migration.
+- Root HACS metadata, repository preparation command and checked GitHub release workflow.
+- Source and integration-only release archives; updated manual installer and HACS setup guide.
+
+## 0.1.0
+
+- Initial native Home Assistant integration with per-screen UI configuration.
+- Safe stable-idle casting, app foreground guards, persistent opt-out, app-launch grace and cooldown retries.
+- Google Cast and script-based LG dashboard transports.
+- Configurable Homeboard Lovelace card, widescreen TV fitting and responsive phone layout.
+- Electricity intervals, live consumption, indoor mean temperature, forecast subscriptions, lock states, honest scene status and configurable app activities.
+- Offline sample preview, backup installer, example packages and regression checks.

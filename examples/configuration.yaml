@@ -1,0 +1,12 @@
+# Merge these keys into configuration.yaml; do not duplicate existing sections.
+# Copy examples/dashboard.yaml to /config/homeboard-dashboard.yaml.
+lovelace:
+  # Storage-mode resources: add the resource in Settings > Dashboards > Resources.
+  # YAML-mode resources can instead be declared in your existing resources list.
+  dashboards:
+    homeboard-home:
+      mode: yaml
+      title: Homeboard
+      icon: mdi:home-heart
+      show_in_sidebar: true
+      filename: homeboard-dashboard.yaml

@@ -1,0 +1,79 @@
+title: Homeboard
+views:
+  - title: Home
+    path: overview
+    # Keep a standard view for HA Cast compatibility (no panel: true).
+    # Full-width card is available on responsive sections dashboards.
+    type: sections
+    max_columns: 4
+    sections:
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:homeboard-tv-card
+            grid_options:
+              columns: full
+            tv_mode: true
+            title: A little more at home.
+            home_name: Our home
+            weather_location: Home
+            time_zone: Europe/Stockholm
+            locale: en-GB
+            # Every entity below is an EXAMPLE: replace it in the card editor.
+            price_entity: sensor.electricity_price
+            price_attribute: raw_today
+            price_start_key: start
+            price_end_key: end
+            price_value_key: value
+            price_factor: 1
+            current_price_factor: 1
+            price_offset: 0
+            price_unit: SEK/kWh
+            power_entity: sensor.home_power
+            temperature_unit: °C
+            temperature_entities:
+              - sensor.living_room_temperature
+              - sensor.bedroom_temperature
+              - sensor.kitchen_temperature
+            weather_entity: weather.home
+            forecast_type: daily
+            lock_entities:
+              - lock.front_door
+              - lock.back_door
+            scenes:
+              - entity: scene.evening
+                name: Evening
+                icon: sun
+                # Optional helper reflecting actual scene target states.
+                active_entity: binary_sensor.evening_scene_active
+              - entity: scene.movie
+                name: Movie night
+                icon: tv
+              - entity: scene.bright
+                name: Bright & focused
+                icon: bolt
+              - entity: scene.goodnight
+                name: Good night
+                icon: moon
+            tvs:
+              - name: Living room · Google TV
+                # Copy from the auto-dashboard switch's entry_id attribute.
+                entry_id: REPLACE_WITH_GOOGLE_TV_CONFIG_ENTRY_ID
+                auto_entity: switch.living_room_auto_dashboard
+                launch_apps: true
+              - name: Bedroom · LG TV
+                entry_id: REPLACE_WITH_LG_CONFIG_ENTRY_ID
+                auto_entity: switch.bedroom_auto_dashboard
+                # Enable only if this entry has a Google/Android TV remote.
+                launch_apps: false
+            apps:
+              - name: Netflix
+                activity: netflix://
+                color: '#e50914'
+              - name: SVT Play
+                # Verify link routing on your TV; override with a package ID if needed.
+                activity: https://www.svtplay.se
+                color: '#54cf87'
+              - name: TV4 Play
+                activity: https://www.tv4play.se
+                color: '#ed3a45'
