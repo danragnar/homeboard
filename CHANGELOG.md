@@ -1,5 +1,10 @@
 # Changes
 
+## 0.2.2
+
+- Set card text alignment explicitly so the Cast receiver cannot center dashboard labels, readings and descriptions.
+- Exercise centered receiver inheritance in the TV preview while keeping the clock, forecast and app buttons intentionally aligned.
+
 ## 0.2.1
 
 - Recognize current Google TV launcher and screensaver IDs; migrate only the previous default allowlist.
