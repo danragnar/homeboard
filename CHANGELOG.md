@@ -1,5 +1,12 @@
 # Changes
 
+## 0.2.6
+
+- Brighter Aurora theme with blue, lilac and mint panels, clearer secondary text, and an optional Forest palette.
+- Optional edge-to-edge TV display covering HA navigation and outer margins. Escape or Exit full screen restores navigation; card editors remain accessible.
+- Spatial arrow-key navigation in browsers that forward keyboard input, with visible focus and focus restored after actions. Physical Google TV remote support still depends on the receiver.
+- Reduced-motion preferences preserve the TV layout fit.
+
 ## 0.2.5
 
 - Keep three balanced columns on landscape Cast receivers with smaller logical viewports, including 960×540.

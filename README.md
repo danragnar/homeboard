@@ -29,7 +29,7 @@ Once the repository is published:
 If you manage **resources** in YAML, add the resource below to your existing `lovelace.resources` list instead. Homeboard logs a reminder and leaves YAML resource configuration under your control:
 
 ```yaml
-- url: /homeboard_tv/0.2.5/homeboard-tv-card.js
+- url: /homeboard_tv/0.2.6/homeboard-tv-card.js
   type: module
 ```
 
@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.2.5`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.2.6`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.2.5.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.2.6.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -132,6 +132,9 @@ The visual card editor provides entity selectors for price, power, temperature s
 | `weather_entity`, `forecast_type` | Forecast subscription; choose `daily`, `hourly`, or `twice_daily` supported by your provider. |
 | `lock_entities` | Read-only lock states. Unknown locks never count as secured. |
 | `scenes` | Objects with `entity`, optional `name`, `icon`, `active_entity`. |
+| `theme` | `aurora` (default): brighter blue panels with mint, lilac and warm accents. `forest`: green palette. |
+| `edge_to_edge` | `true` fills the viewport over HA navigation and removes the outer card border in TV mode. Default `false`. Escape or **Exit full screen** returns to HA navigation; **Expand dashboard** re-enters. Disabled inside the HA card editor. |
+| `keyboard_navigation` | Arrow-key spatial navigation, default `true`; requires a browser/receiver that forwards key events. |
 | `tvs` | Objects with `name`, `entry_id`, optional `auto_entity`, `launch_apps`. Set `launch_apps: false` on an LG-only entry without an Android remote. |
 | `apps` | Objects with `name`, `activity`, optional hexadecimal `color`. Add/reorder freely. |
 
@@ -163,7 +166,7 @@ HA scenes are snapshots, not on/off switches. Without an `active_entity`, Homebo
 
 Netflix starts with `netflix://`. SVT and TV4 start with their public HTTPS links. **Verify routing on your Google TV:** Android may open a browser or reject a link depending on the installed apps and their link associations. Set each `activity` to an app-supported deep link or the actual package ID shown by your remote's `current_activity`. Package-ID launching itself is unreliable on some Android TV versions; the activities are deliberately editable rather than assuming a universal package. See [Android TV Remote](https://www.home-assistant.io/integrations/androidtv_remote/).
 
-A standard Google Cast receiver on a TV is primarily a display; a Google TV D-pad does not automatically become a pointer for an HA Cast custom card. Use the same dashboard on your phone/tablet to tap scenes and apps. A compatible TV browser supports keyboard/pointer interaction. Homeboard does not claim remote-navigation support inside the Cast receiver.
+Homeboard supports spatial navigation with arrow keys, a visible focus ring, and Enter/Space activation in browsers that deliver keyboard events. Focus survives sensor refreshes; select fields keep their native arrow-key behavior. This does not make the physical Google TV remote work in every receiver. A standard Google Cast receiver on a TV is primarily a display; a Google TV D-pad does not automatically become a pointer for an HA Cast custom card. Use the same dashboard on your phone/tablet to tap scenes and apps. A compatible TV browser supports keyboard/pointer interaction. Homeboard does not claim remote-navigation support inside the Cast receiver.
 
 ## Local preview and checks
 
@@ -174,7 +177,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.2.5.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.2.6.zip and homeboard_tv.zip
 ```
 
 The preview opens a true 16:9 TV canvas even in a narrow app pane, with selectable 1080p, 720p, 960×540 Cast, and responsive views. The preview always identifies sample data, uses a fixed sample day, and simulates every action. It never connects to HA or controls devices. Runtime assets use no CDN, external fonts, analytics, or front-end framework.

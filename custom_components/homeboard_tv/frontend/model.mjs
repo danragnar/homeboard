@@ -64,7 +64,7 @@ export function sceneStatus(states, scene, config = {}) {
 }
 export const DEFAULT_CONFIG = {
   type:"custom:homeboard-tv-card", title:"A little more at home.", home_name:"Our home",
-  tv_mode:true, time_zone:"Europe/Stockholm", locale:"en-GB", temperature_unit:"°C", price_unit:"SEK/kWh",
+  tv_mode:true, theme:"aurora", edge_to_edge:false, keyboard_navigation:true, time_zone:"Europe/Stockholm", locale:"en-GB", temperature_unit:"°C", price_unit:"SEK/kWh",
   price_entity:"", price_attribute:"raw_today", price_value_key:"value", price_start_key:"start", price_end_key:"end",
   price_factor:1, price_offset:0, power_entity:"", temperature_entities:[], weather_entity:"", forecast_type:"daily",
   lock_entities:[], scenes:[], tvs:[], apps:[

@@ -1,11 +1,11 @@
 {
   "name": "homeboard-tv",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "type": "module",
   "scripts": {
     "preview": "python -m http.server 8124 --bind 127.0.0.1",
-    "test": "node tests/model.test.mjs && python -m unittest discover -s tests -p 'test_*.py'",
+    "test": "node --test tests/*.test.mjs && python -m unittest discover -s tests -p 'test_*.py'",
     "check": "node --check custom_components/homeboard_tv/frontend/homeboard-tv-card.js && node --check custom_components/homeboard_tv/frontend/model.mjs && node --check custom_components/homeboard_tv/frontend/styles.mjs && node --check preview/demo.mjs && python -m compileall -q custom_components scripts",
     "package": "python scripts/package.py"
   }

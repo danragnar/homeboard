@@ -14,6 +14,9 @@ views:
             grid_options:
               columns: full
             tv_mode: true
+            theme: aurora
+            edge_to_edge: true
+            keyboard_navigation: true
             title: A little more at home.
             home_name: Our home
             weather_location: Home
