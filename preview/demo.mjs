@@ -1,4 +1,4 @@
-import '../custom_components/homeboard_tv/frontend/homeboard-tv-card.js?preview=0.2.8';
+import '../custom_components/homeboard_tv/frontend/homeboard-tv-card.js?preview=0.2.9';
 import {DEFAULT_CONFIG} from '../custom_components/homeboard_tv/frontend/model.mjs';
 const card=document.querySelector('homeboard-tv-card');
 card.demoMode=true;

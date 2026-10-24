@@ -7,18 +7,19 @@ globalThis.customElements = {define(){}};
 globalThis.window = {};
 const {HomeboardTVCard} = await import('../custom_components/homeboard_tv/frontend/homeboard-tv-card.js');
 function fixture() {
- const card=Object.create(HomeboardTVCard.prototype);
- const control=(left,top,width=80,height=40)=>({tagName:'BUTTON',getBoundingClientRect:()=>({left,top,width,height}),focus(){card.shadowRoot.activeElement=this;}});
+ const card=Object.create(HomeboardTVCard.prototype), attrs=new Set();
+ const control=(left,top,width=80,height=40)=>({tagName:'BUTTON',classList:{contains:()=>false},getAttribute:()=>null,getBoundingClientRect:()=>({left,top,width,height}),click(){this.clicks=(this.clicks||0)+1;},focus(){card.shadowRoot.activeElement=this;}});
  const controls=[control(0,0),control(100,0),control(0,100),control(100,100),control(0,0,0,0)];
  card._config={keyboard_navigation:true,tv_mode:true};
  card.shadowRoot={activeElement:null,querySelectorAll:()=>controls};
- card.hasAttribute=name=>name==='edge-to-edge';
+ card.hasAttribute=name=>attrs.has(name);
+ card.setAttribute=name=>attrs.add(name);
  card.render=()=>{card.fitted=true;};
- const key=(key,path=[card])=>{
-  const event={key,target:{tagName:'BODY'},composedPath:()=>path,preventDefault(){this.defaultPrevented=true;}};
+ const key=(key,path=[card],extras={})=>{
+  const event={key,target:{tagName:'BODY'},composedPath:()=>path,preventDefault(){this.defaultPrevented=true;},stopPropagation(){this.stopped=true;},...extras};
   card.navigate(event); return event;
  };
- return {card,controls,key};
+ return {card,controls,key,attrs};
 }
 test('Arrows enter the card and choose controls in the requested direction',()=>{
  const {card,controls,key}=fixture();
@@ -29,18 +30,36 @@ test('Arrows enter the card and choose controls in the requested direction',()=>
  key('ArrowLeft'); assert.equal(card.shadowRoot.activeElement,controls[2]);
  key('ArrowUp'); assert.equal(card.shadowRoot.activeElement,controls[0]);
 });
-test('Text fields, selects, dialogs and unrelated cards retain their keys',()=>{
+test('Unrelated inputs, dialogs and embedded cards retain their keys',()=>{
  const {card,key}=fixture();
- for(const tagName of ['INPUT','TEXTAREA','SELECT','HA-DIALOG']) assert.equal(key('ArrowDown',[{tagName},card]).defaultPrevented,undefined);
+ for(const tagName of ['INPUT','TEXTAREA','SELECT','HA-DIALOG']) assert.equal(key('ArrowDown',[{tagName}]).defaultPrevented,undefined);
  const event={key:'ArrowRight',target:{tagName:'BUTTON'},composedPath:()=>[],preventDefault(){throw Error('Unrelated key intercepted');}};
  card.navigate(event); assert.equal(card.shadowRoot.activeElement,null);
- card._drawer=true; assert.equal(key('ArrowDown').defaultPrevented,undefined);
+ card.shadowRoot.activeElement={tagName:'TEXTAREA'};
+ assert.equal(key('ArrowDown').defaultPrevented,undefined);
 });
-test('Escape returns from edge-to-edge display and disabled navigation leaves keys alone',()=>{
- const {card,key}=fixture();
+test('Escape exits edge-to-edge; disabled navigation leaves arrows alone',()=>{
+ const {card,key,attrs}=fixture(); attrs.add('edge-to-edge');
  assert.equal(key('Escape').defaultPrevented,true);
  assert.equal(card._exitFullscreen,true); assert.equal(card.fitted,true);
  card._config.keyboard_navigation=false; assert.equal(key('ArrowDown').defaultPrevented,undefined);
+});
+test('Select first establishes focus, then activates once; holds do not repeat actions',()=>{
+ const {card,controls,key}=fixture();
+ key('Select'); assert.equal(card.shadowRoot.activeElement,controls[0]); assert.equal(controls[0].clicks,undefined);
+ key('Select'); assert.equal(controls[0].clicks,1);
+ key('Select',[card],{repeat:true}); assert.equal(controls[0].clicks,1);
+ assert.equal(card._activationKey,'Enter');
+});
+test('Native TV selectors allow left/right to leave and retain native up/down',()=>{
+ const {card,controls,key}=fixture(); controls[0].tagName='SELECT';card.shadowRoot.activeElement=controls[0];
+ assert.equal(key('ArrowDown').defaultPrevented,undefined);
+ key('ArrowRight'); assert.equal(card.shadowRoot.activeElement,controls[1]);
+});
+test('Full-screen mode takes arrows from covered HA controls, but leaves external dialogs alone',()=>{
+ const {card,controls,key,attrs}=fixture(); attrs.add('edge-to-edge');
+ key('ArrowRight',[],{target:{tagName:'A'}}); assert.equal(card.shadowRoot.activeElement,controls[0]);
+ assert.equal(key('ArrowRight',[{tagName:'HA-DIALOG'}]).defaultPrevented,undefined);
 });
 
 function edgeFixture() {

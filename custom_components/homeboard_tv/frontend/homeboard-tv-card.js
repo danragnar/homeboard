@@ -1,4 +1,6 @@
-import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, lockSummary, sceneStatus} from './model.mjs';
+import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, lockSummary, sceneStatus, zonedDate} from './model.mjs';
+import {navigationKey, directionalTarget} from './navigation.mjs';
+import {patchHTML} from './dom.mjs';
 import {styles} from './styles.mjs';
 
 const paths = {
@@ -28,6 +30,11 @@ export class HomeboardTVCard extends HTMLElement {
     this._forecast = []; this._weatherGeneration = 0; this._selectedTV = 0; this._busy = false; this._notice = '';
     this._onResize = () => this.scheduleFit();
     this._onKey = event => this.navigate(event);
+    this._onKeyUp = event => {
+      const key = navigationKey(event);
+      if (this._activationKey === key) { this._activationKey = null; event.preventDefault(); event.stopPropagation(); }
+    };
+    this.shadowRoot.addEventListener('pointerdown', () => this.removeAttribute('remote-navigation'));
     this._resizeObserver = new ResizeObserver(entries => {
       const width = entries[0]?.contentRect.width;
       if (width !== this._lastWidth) { this._lastWidth = width; this.scheduleFit(); }
@@ -68,7 +75,11 @@ export class HomeboardTVCard extends HTMLElement {
   set hass(hass) {
     const previous = this._hass; this._hass = hass;
     if (this.isConnected && (!previous || previous.connection !== hass.connection)) this.subscribeWeather();
-    if (!this._drawer) this.render();
+    const ids = new Set([this._config.price_entity,this._config.power_entity,this._config.weather_entity,
+      ...this._config.temperature_entities,...this._config.lock_entities,
+      ...this._config.scenes.flatMap(scene => [scene.entity,scene.active_entity]),
+      ...this._config.tvs.map(tv => tv.auto_entity)].filter(Boolean));
+    if (!this._drawer && (!previous || previous.connected !== hass.connected || [...ids].some(id => previous.states?.[id] !== hass.states?.[id]))) this.render();
   }
   getCardSize() { return 12; }
   getGridOptions() { return {columns:'full', rows:'auto'}; }
@@ -137,7 +148,8 @@ export class HomeboardTVCard extends HTMLElement {
   connectedCallback() {
     this._resizeObserver.observe(this);
     window.addEventListener('resize', this._onResize);
-    window.addEventListener('keydown', this._onKey);
+    window.addEventListener('keydown', this._onKey, true);
+    window.addEventListener('keyup', this._onKeyUp, true);
     this._timer = setInterval(() => { if (!this._drawer) this.render(); }, 30000);
     if (this._hass) this.subscribeWeather();
     this.render();
@@ -145,36 +157,64 @@ export class HomeboardTVCard extends HTMLElement {
   disconnectedCallback() {
     this.syncEdgeToEdge(false);
     this._resizeObserver.disconnect(); window.removeEventListener('resize', this._onResize);
-    window.removeEventListener('keydown', this._onKey);
+    window.removeEventListener('keydown', this._onKey, true);
+    window.removeEventListener('keyup', this._onKeyUp, true);
     cancelAnimationFrame(this._fitFrame);
     clearInterval(this._timer); this._weatherGeneration++;
     this._weatherUnsub?.(); this._weatherUnsub = null; this._weatherKey = null;
   }
+  remoteControls() {
+    const scope = this._drawer ? this.shadowRoot.querySelector('.drawer') : this.shadowRoot;
+    return [...(scope?.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled),textarea:not(:disabled)') || [])]
+      .filter(el => !el.hidden && el.getBoundingClientRect().width && el.getBoundingClientRect().height);
+  }
   navigate(event) {
-    if (event.defaultPrevented || !this._config.tv_mode) return;
-    // Never take keys away from other cards, HA dialogs, or text editing.
-    if (this._drawer) return;
-    const path = event.composedPath();
-    if (path.some(el => el.tagName && ['INPUT','TEXTAREA','SELECT','HA-DIALOG'].includes(el.tagName))) return;
-    if (event.key === 'Escape' && this.hasAttribute('edge-to-edge')) {
-      this._exitFullscreen = true; this.render(); event.preventDefault(); return;
-    }
-    if (!this._config.keyboard_navigation || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)) return;
-    if (!path.includes(this) && !['BODY','HTML'].includes(event.target?.tagName)) return;
-    const controls = [...this.shadowRoot.querySelectorAll('button:not(:disabled),select:not(:disabled)')]
-      .filter(el => el.getBoundingClientRect().width && el.getBoundingClientRect().height);
+    if (!this._config.tv_mode) return;
+    const path = event.composedPath(), key = navigationKey(event);
+    const owned = path.includes(this);
+    // Capture before HA's global handlers, but leave unrelated dialogs/inputs alone.
+    if (!owned && path.some(el => el.tagName && ['INPUT','TEXTAREA','SELECT','HA-DIALOG','DIALOG'].includes(el.tagName))) return;
+    if (!owned && !this.hasAttribute('edge-to-edge') && !['BODY','HTML'].includes(event.target?.tagName)) return;
     const active = this.shadowRoot.activeElement;
-    if (!active) { controls[0]?.focus(); event.preventDefault(); return; }
-    const from = active.getBoundingClientRect();
-    const x = from.left + from.width / 2, y = from.top + from.height / 2;
-    const horizontal = ['ArrowLeft','ArrowRight'].includes(event.key);
-    const sign = ['ArrowLeft','ArrowUp'].includes(event.key) ? -1 : 1;
-    const ranked = controls.filter(el => el !== active).map(el => {
-      const box = el.getBoundingClientRect(), dx = box.left + box.width / 2 - x, dy = box.top + box.height / 2 - y;
-      const forward = (horizontal ? dx : dy) * sign, cross = Math.abs(horizontal ? dy : dx);
-      return {el,forward,score:forward + cross * 3};
-    }).filter(item => item.forward > 1).sort((a,b) => a.score - b.score);
-    ranked[0]?.el.focus(); event.preventDefault();
+    const editing = active && ['INPUT','TEXTAREA'].includes(active.tagName);
+    if (key === 'Escape') {
+      if (this._drawer) { this._drawer=false; this.render(); this.shadowRoot.querySelector('[data-action="settings"]')?.focus(); }
+      else if (this.hasAttribute('edge-to-edge')) { this._exitFullscreen=true; this.render(); }
+      else return;
+      event.preventDefault(); event.stopPropagation(); return;
+    }
+    if (!this._config.keyboard_navigation || editing) return;
+    const arrow = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(key);
+    const activate = key === 'Enter' || key === ' ';
+    if (!arrow && !activate && key !== 'Tab') return;
+    // Keep native select's up/down and opening behavior; left/right always leave it.
+    if (active?.tagName === 'SELECT' && !['ArrowLeft','ArrowRight','Tab'].includes(key)) return;
+    const controls = this.remoteControls();
+    if (!controls.length) return;
+    if (key === 'Tab') {
+      if (!this.hasAttribute('edge-to-edge') && !this._drawer) return;
+      const index = controls.indexOf(active), step = event.shiftKey ? -1 : 1;
+      controls[(index+step+controls.length)%controls.length]?.focus({preventScroll:this.hasAttribute('tv-landscape')});
+    } else {
+      event.preventDefault(); event.stopPropagation();
+      this.setAttribute('remote-navigation','');
+      if (event.repeat && Date.now()-(this._lastRemoteMove || 0) < 150) return;
+      if (activate) {
+        if (event.repeat) return;
+        this._activationKey = key;
+      }
+      const hasFocus = controls.includes(active);
+      if (!hasFocus) {
+        const first = controls.find(el => el.classList?.contains('scene')) || controls.find(el => el.classList?.contains('app')) || controls[0];
+        first.focus({preventScroll:this.hasAttribute('tv-landscape')});
+      } else if (activate) {
+        if (active.getAttribute('aria-disabled') !== 'true') active.click();
+      } else {
+        const target = directionalTarget(active.getBoundingClientRect(),controls.filter(el => el !== active).map(el => ({el,box:el.getBoundingClientRect()})),key);
+        target?.focus({preventScroll:this.hasAttribute('tv-landscape')}); this._lastRemoteMove=Date.now();
+      }
+    }
+    event.preventDefault(); event.stopPropagation();
   }
   async subscribeWeather() {
     const {weather_entity:entity, forecast_type:type} = this._config;
@@ -226,7 +266,11 @@ export class HomeboardTVCard extends HTMLElement {
     const focusTV=focus?.hasAttribute?.('data-tv');
     const c=this._config, states=this._hass?.states || {}, now=this.now;
     const priceState=states[c.price_entity];
-    const rows=priceIntervals(priceState?.attributes?.[c.price_attribute], c, now);
+    const rawPrices=priceState?.attributes?.[c.price_attribute], priceDay=zonedDate(now,c.time_zone);
+    if (!this._priceCache || this._priceCache.raw !== rawPrices || this._priceCache.config !== c || this._priceCache.day !== priceDay) {
+      this._priceCache={raw:rawPrices,config:c,day:priceDay,rows:priceIntervals(rawPrices,c,now)};
+    }
+    const rows=this._priceCache.rows;
     const summary=priceSummary(rows,now);
     const current=summary.current?.value ?? (finite(priceState?.state) === null ? null : finite(priceState.state)*(finite(c.current_price_factor)??1)+(finite(c.price_offset)??0));
     const band=priceBand(current,rows);
@@ -242,7 +286,7 @@ export class HomeboardTVCard extends HTMLElement {
       if(c.forecast_type==='hourly') return Date.parse(item.datetime)>=+now;
       return Date.parse(item.datetime) >= +now-86400000;
     }).slice(0,5);
-    this.shadowRoot.innerHTML=`<style>${styles}</style><ha-card><div class="shell">
+    patchHTML(this.shadowRoot,`<style>${styles}</style><ha-card data-homeboard-fit><div class="shell" data-homeboard-fit>
       <header class="topbar"><div class="brand">${icon('home',25)} homeboard<span>${esc(c.home_name)}</span></div><div class="meta"><span>HOME, IN BALANCE</span>${this.demoMode?'<span class="pill amber">Demo · sample data</span>':''}<button class="icon-button" data-action="settings" aria-label="Dashboard settings">${icon('settings',17)}</button></div></header>
       <section class="heading"><div><div class="eyebrow">YOUR EVERYDAY, AT A GLANCE</div><h1 class="greeting">${esc(c.title)}</h1><p class="subheading">${esc(c.subtitle || 'A comfortable home. A clearer picture.')}</p></div><div class="clock">${esc(this.time(now))}<small>${esc(date)}</small></div></section>
       ${this._notice?`<div class="notice" role="status">${esc(this._notice)}<button data-action="dismiss" aria-label="Dismiss notification">×</button></div>`:''}
@@ -257,17 +301,17 @@ export class HomeboardTVCard extends HTMLElement {
           <div class="forecast">${forecast.length?forecast.map(f=>`<div class="forecast-day">${esc(c.forecast_type==='hourly'?this.time(f.datetime):new Date(f.datetime).toLocaleDateString(c.locale,{timeZone:c.time_zone,weekday:'short'}))}${icon(weatherIcon(f.condition||''),20)}<strong>${this.fmt(f.temperature,0)}°</strong>${f.templow!==undefined?`<small>${this.fmt(f.templow,0)}°</small>`:''}</div>`).join(''):`<div class="empty" style="grid-column:1/-1;padding:0">${esc(this._weatherError || 'Choose a weather entity for the forecast.')}</div>`}</div>
         </section>
         <section class="card security"><div class="card-head"><span class="card-title">${icon('lock')} Peace of mind</span><span class="pill ${locks.secured?'':'amber'}">${locks.items.length?`${locks.items.filter(i=>i.state==='locked').length}/${locks.items.length} secured`:'Not configured'}</span></div><div class="security-title">${icon('shield',31)}<div><strong>${locks.secured?'All doors secured':!locks.items.length?'Add your doors':locks.unknown?'Check door status':'A door needs attention'}</strong><small>Live lock status · view only</small></div></div>${locks.items.length?locks.items.map(lock=>`<div class="lock-row"><span>${esc(lock.name)}</span><span class="lock-state ${lock.state==='locked'?'':'warn'}">${icon('lock',12)}${esc(lock.state.charAt(0).toUpperCase()+lock.state.slice(1))}</span></div>`).join(''):'<div class="empty">Select your lock entities in the card editor.</div>'}</section>
-        <section class="card scenes"><div class="card-head"><span class="card-title">${icon('scene')} Set the mood</span><span class="reduced">SCENES</span></div><div class="scene-list">${c.scenes.length?c.scenes.map((scene,i)=>{const status=sceneStatus(states,scene,c);return `<button class="scene ${status==='Active'?'active':''}" data-action="scene" data-index="${i}" ${this._busy?'disabled':''}><span class="scene-top">${icon(scene.icon || 'scene',18)}${status==='Active'?'<i class="dot" style="color:var(--mint)"></i>':''}</span><span class="scene-name">${esc(scene.name || states[scene.entity]?.attributes?.friendly_name || scene.entity)}</span><span class="scene-status">${esc(status)}</span></button>`}).join(''):'<div class="empty">Add scenes and optional activity helpers.</div>'}</div></section>
+        <section class="card scenes"><div class="card-head"><span class="card-title">${icon('scene')} Set the mood</span><span class="reduced">SCENES</span></div><div class="scene-list">${c.scenes.length?c.scenes.map((scene,i)=>{const status=sceneStatus(states,scene,c);return `<button class="scene ${status==='Active'?'active':''}" data-action="scene" data-index="${i}" aria-disabled="${this._busy}"><span class="scene-top">${icon(scene.icon || 'scene',18)}${status==='Active'?'<i class="dot" style="color:var(--mint)"></i>':''}</span><span class="scene-name">${esc(scene.name || states[scene.entity]?.attributes?.friendly_name || scene.entity)}</span><span class="scene-status">${esc(status)}</span></button>`}).join(''):'<div class="empty">Add scenes and optional activity helpers.</div>'}</div></section>
       </main>
-      <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app on your selected Google TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps">${c.apps.map((app,i)=>`<button class="app" data-action="app" data-index="${i}" ${!tv || tv.launch_apps===false || this._busy?'disabled':''}><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>
-      <footer class="footer"><div class="live"><i class="dot"></i>${this.demoMode?'Preview · actions are simulated':this._hass?.connected===false?'Home Assistant disconnected':'Connected to Home Assistant'}<span>· ${esc(c.time_zone)}</span></div><div class="footer-actions">${c.edge_to_edge?`<button class="text-button" data-action="fullscreen">${this._exitFullscreen?'Expand dashboard':'Exit full screen'}</button>`:''}${auto?`<span><button class="toggle ${auto.state==='on'?'on':''}" data-action="auto" role="switch" aria-checked="${auto.state==='on'}" aria-label="Automatic dashboard" ${!['on','off'].includes(auto.state)?'disabled':''}></button>Auto dashboard</span>`:''}<button class="text-button" data-action="cast" ${!tv || this._busy?'disabled':''}>${icon('cast',12)} Show dashboard</button></div></footer>
-    </div></ha-card>`;
+      <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app on your selected Google TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps">${c.apps.map((app,i)=>`<button class="app" data-action="app" data-index="${i}" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}"><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>
+      <footer class="footer"><div class="live"><i class="dot"></i>${this.demoMode?'Preview · actions are simulated':this._hass?.connected===false?'Home Assistant disconnected':'Connected to Home Assistant'}<span>· ${esc(c.time_zone)}</span></div><div class="footer-actions">${c.edge_to_edge?`<button class="text-button" data-action="fullscreen">${this._exitFullscreen?'Expand dashboard':'Exit full screen'}</button>`:''}${auto?`<span><button class="toggle ${auto.state==='on'?'on':''}" data-action="auto" role="switch" aria-checked="${auto.state==='on'}" aria-label="Automatic dashboard" ${!['on','off'].includes(auto.state)?'disabled':''}></button>Auto dashboard</span>`:''}<button class="text-button" data-action="cast" ${!tv?'disabled':''} aria-disabled="${this._busy}">${icon('cast',12)} Show dashboard</button></div></footer>
+    </div></ha-card>`);
     this.scheduleFit();
-    if(focusTV) this.shadowRoot.querySelector('[data-tv]')?.focus();
-    else if(focusAction) [...this.shadowRoot.querySelectorAll('[data-action]')].find(el=>el.dataset.action===focusAction&&el.dataset.index===focusIndex)?.focus();
+    if(focusTV && !this.shadowRoot.activeElement) this.shadowRoot.querySelector('[data-tv]')?.focus({preventScroll:true});
+    else if(focusAction && !this.shadowRoot.activeElement) [...this.shadowRoot.querySelectorAll('[data-action]')].find(el=>el.dataset.action===focusAction&&el.dataset.index===focusIndex)?.focus({preventScroll:true});
   }
   async onClick(event) {
-    const target=event.target.closest('[data-action]'); if (!target || target.disabled) return;
+    const target=event.target.closest('[data-action]'); if (!target || target.disabled || target.getAttribute('aria-disabled') === 'true') return;
     const action=target.dataset.action, index=Number(target.dataset.index), c=this._config;
     if(action==='fullscreen') { this._exitFullscreen=!this._exitFullscreen; this.render(); return; }
     if(action==='settings') { this.openSettings(); return; }
@@ -288,7 +332,7 @@ export class HomeboardTVCard extends HTMLElement {
     } catch(error) { this._notice = `Action failed: ${error.message || error}`; }
     finally {
       this._busy=false; this.render();
-      if (document.activeElement === this || document.activeElement === document.body) {
+      if (!this.shadowRoot.activeElement && (document.activeElement === this || document.activeElement === document.body)) {
         [...this.shadowRoot.querySelectorAll('[data-action]')].find(el => el.dataset.action === action && el.dataset.index === target.dataset.index)?.focus();
       }
     }

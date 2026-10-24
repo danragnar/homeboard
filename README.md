@@ -29,7 +29,7 @@ Once the repository is published:
 If you manage **resources** in YAML, add the resource below to your existing `lovelace.resources` list instead. Homeboard logs a reminder and leaves YAML resource configuration under your control:
 
 ```yaml
-- url: /homeboard_tv/0.2.8/homeboard-tv-card.js
+- url: /homeboard_tv/0.2.9/homeboard-tv-card.js
   type: module
 ```
 
@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.2.8`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.2.9`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.2.8.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.2.9.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -166,7 +166,22 @@ HA scenes are snapshots, not on/off switches. Without an `active_entity`, Homebo
 
 Netflix starts with `netflix://`. SVT and TV4 start with their public HTTPS links. **Verify routing on your Google TV:** Android may open a browser or reject a link depending on the installed apps and their link associations. Set each `activity` to an app-supported deep link or the actual package ID shown by your remote's `current_activity`. Package-ID launching itself is unreliable on some Android TV versions; the activities are deliberately editable rather than assuming a universal package. See [Android TV Remote](https://www.home-assistant.io/integrations/androidtv_remote/).
 
-Homeboard supports spatial navigation with arrow keys, a visible focus ring, and Enter/Space activation in browsers that deliver keyboard events. Focus survives sensor refreshes; select fields keep their native arrow-key behavior. This does not make the physical Google TV remote work in every receiver. A standard Google Cast receiver on a TV is primarily a display; a Google TV D-pad does not automatically become a pointer for an HA Cast custom card. Use the same dashboard on your phone/tablet to tap scenes and apps. A compatible TV browser supports keyboard/pointer interaction. Homeboard does not claim remote-navigation support inside the Cast receiver.
+Homeboard supports spatial navigation with arrow keys, a visible focus ring, and Enter/Space/Select activation in browsers that deliver keyboard events. Navigation runs before page-level handlers and prefers controls in the same row or column. The first remote key establishes focus on a scene/app; a subsequent OK/Select activates it. Held OK does not repeat actions. On the TV selector, up/down changes the selection and left/right moves to another control. Live updates patch existing controls instead of recreating them; unrelated entity changes do not redraw the card. Focus survives sensor refreshes and notices; select fields keep their native arrow-key behavior. This does not make the physical Google TV remote work in every receiver. A standard Google Cast receiver on a TV is primarily a display; a Google TV D-pad does not automatically become a pointer for an HA Cast custom card. Use the same dashboard on your phone/tablet to tap scenes and apps. A compatible TV browser supports keyboard/pointer interaction. Homeboard does not claim remote-navigation support inside the Cast receiver.
+
+### TV Bro manual trial
+
+Use TV Bro’s direct-navigation mode to deliver keys to the page; ordinary mode moves its virtual mouse. Clear app data only as a troubleshooting last resort, since it removes the saved login. In this installation a one-second held Back command through HA exits direct mode; the physical CEC and Google TV phone remotes did not reliably transmit that hold. The equivalent manual action is:
+
+```yaml
+action: remote.send_command
+target:
+  entity_id: remote.REPLACE_WITH_YOUR_TV
+data:
+  command: BACK
+  hold_secs: 1
+```
+
+Browser regression tests do not establish that a particular CEC remote or TV browser forwards the same keys. Verify arrows, one OK activation, and focus retention during live power updates on the actual TV before configuring browser automation.
 
 ## Local preview and checks
 
@@ -177,8 +192,10 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.2.8.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.2.9.zip and homeboard_tv.zip
 ```
+
+Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.
 
 Open `/preview/sidebar-check.html` for a sidebar/header regression fixture with a transformed content ancestor. Edge-to-edge mode must cover both overlays; Exit full screen must restore them.
 

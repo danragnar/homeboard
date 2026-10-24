@@ -1,5 +1,12 @@
 # Changes
 
+## 0.2.9
+
+- Preserve interactive DOM elements across live data updates and notices, retaining browser focus and native selector state. Skip unrelated HA entity updates and cache price interval parsing.
+- Capture remote keys before page-level handlers; normalize Android/legacy Select and arrow keys, activate once on OK/Space, and ignore held-button activation repeats.
+- Prefer aligned controls for directional focus, show an explicit remote focus outline, and allow left/right to leave TV selectors. Pending actions stay focusable and do not steal newer focus when they finish.
+- Add browser regression checks for live updates, notice insertion/removal, native activation, and pending requests. TV Bro hardware verification remains necessary.
+
 ## 0.2.8
 
 - Promote edge-to-edge Homeboard to the browser top layer so HA sidebar stacking and ancestor clipping cannot leave navigation above the card.

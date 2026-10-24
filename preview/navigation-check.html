@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Homeboard · Remote navigation checks</title><style>body{margin:0;background:#17283e;color:white;font:14px system-ui}header{padding:16px}button{font:inherit;padding:10px}#result{white-space:pre-wrap}#dom-test{position:fixed;left:0;top:0;z-index:-1}</style></head><body><header><h1>Remote navigation regression checks</h1><button id="run">Run checks</button><p>Simulated service calls: <output id="service-count">0</output></p><pre id="result" role="status">Ready. Uses simulated Home Assistant data only.</pre></header><div id="dom-test"></div><homeboard-tv-card></homeboard-tv-card><script type="module">
+import {patchHTML} from '../custom_components/homeboard_tv/frontend/dom.mjs?v=0.2.9';
+import '../custom_components/homeboard_tv/frontend/homeboard-tv-card.js?preview=0.2.9';
+const card=document.querySelector('homeboard-tv-card'), result=document.querySelector('#result'), root=document.querySelector('#dom-test');
+card.demoMode=true;
+const state=value=>({state:String(value),attributes:{unit_of_measurement:'W'}});
+const states={'sensor.power':state(100)};
+let calls=0, delayCalls=false, pendingResolve;
+const hass={states,connected:true,async callService(){calls++;document.querySelector('#service-count').textContent=String(calls);if(delayCalls)await new Promise(resolve=>pendingResolve=resolve);}};
+card.setConfig({power_entity:'sensor.power',tvs:[{name:'TV one',entry_id:'demo-1'},{name:'TV two',entry_id:'demo-2'}],scenes:[{entity:'scene.test',name:'Test scene'}],edge_to_edge:false});card.hass=hass;
+const assert=(condition,message)=>{if(!condition)throw new Error(message);};
+const key=(target,name,repeat=false)=>{const event=new KeyboardEvent('keydown',{key:name,repeat,bubbles:true,composed:true,cancelable:true});target.dispatchEvent(event);target.dispatchEvent(new KeyboardEvent('keyup',{key:name,bubbles:true,composed:true,cancelable:true}));return event;};
+const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
+document.querySelector('#run').onclick=async()=>{
+ const passed=[];
+ try {
+  patchHTML(root,'<section>Heading</section>\n<main><button data-action="stable">Stable</button></main>\n<footer>Footer</footer>');
+  const stable=root.querySelector('button');stable.focus();
+  patchHTML(root,'<section>Heading</section>\n<div role="status">Notice</div>\n<main><button data-action="stable">Stable</button></main>\n<footer>Footer</footer>');
+  assert(document.activeElement===stable,'Notice insertion moved focus');
+  patchHTML(root,'<section>Heading</section>\n<main><button data-action="stable">Stable</button></main>\n<footer>Updated footer</footer>');
+  assert(document.activeElement===stable && stable===root.querySelector('button'),'Notice removal recreated focused button');passed.push('PASS · DOM identity and focus survive notice insertion/removal');
+  const app=card.shadowRoot.querySelector('[data-action="app"]');app.focus();
+  for(let i=0;i<30;i++) card.hass={...hass,states:{...states,'sensor.power':state(100+i)}};
+  assert(card.shadowRoot.activeElement===app && app===card.shadowRoot.querySelector('[data-action="app"]'),'Live power updates recreated app/focus');passed.push('PASS · 30 relevant updates preserve the exact focused button');
+  const observer=new MutationObserver(()=>{});observer.observe(card.shadowRoot,{subtree:true,childList:true,attributes:true,characterData:true});
+  card.hass={...card._hass,states:{...card._hass.states,'sensor.unrelated':state(5)}};
+  assert(observer.takeRecords().length===0,'Unrelated entity update mutated card DOM');observer.disconnect();passed.push('PASS · unrelated HA state updates do not redraw the card');
+  key(app,'Select');await settle();assert(calls===1,'Select did not activate exactly once');
+  assert(card.shadowRoot.activeElement===app,'Action lost focus');
+  key(app,'Select',true);await settle();assert(calls===1,'Held Select repeated an action');passed.push('PASS · Select activates once, preserves focus, ignores held repeats');
+  delayCalls=true;key(app,'Enter');
+  key(app,'ArrowRight');const movedFocus=card.shadowRoot.activeElement;
+  assert(movedFocus!==app,'Cannot move focus while a request is pending');
+  delayCalls=false;pendingResolve();await settle();
+  assert(card.shadowRoot.activeElement===movedFocus,'Completing a request stole newer focus');passed.push('PASS · pending/completed requests do not trap or steal focus');
+  const selector=card.shadowRoot.querySelector('[data-tv]');selector.focus();key(selector,'ArrowRight');
+  assert(card.shadowRoot.activeElement!==selector,'Right key could not leave native TV selector');passed.push('PASS · Left/right can leave the native TV selector');
+  result.textContent=passed.join('\n')+'\nAll checks passed. Calls use a simulated service only.';
+ } catch(error) {result.textContent=passed.join('\n')+'\nFAIL · '+error.message;}
+};
+</script></body></html>
