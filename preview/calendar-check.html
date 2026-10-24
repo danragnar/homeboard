@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Homeboard calendar checks</title><style>body{font:14px system-ui;background:#17283e;color:white}pre{white-space:pre-wrap}iframe{border:0;position:absolute;left:0;top:200px;transform:scale(.2);transform-origin:top left}</style><h1>Calendar and TV layout checks</h1><pre id="result">Running…</pre><iframe title="Sample dashboard" src="./dashboard.html"></iframe><script type="module">
+const result=document.querySelector('#result'),frame=document.querySelector('iframe'),passed=[];
+const assert=(ok,message)=>{if(!ok)throw Error(message);};
+const settle=()=>new Promise(r=>setTimeout(r,100));
+try {
+ await new Promise(r=>frame.addEventListener('load',r,{once:true}));await settle();
+ const card=frame.contentDocument.querySelector('homeboard-tv-card'),root=card.shadowRoot;
+ const config={...card._config,calendar_entity:'calendar.family',calendar_max_events:3};card.setConfig(config);
+ await card.refreshCalendar(true);
+ assert(root.querySelectorAll('.agenda-event').length===3,'Three sample events missing');
+ assert(root.querySelector('.calendar').textContent.includes('All day'),'All-day event missing');
+ assert(root.querySelector('.energy .power-value').textContent.includes('1.84'),'Power not in electricity card');
+ assert(root.querySelectorAll('main .card').length===6,'Expected six dashboard panels');
+ passed.push('PASS · agenda, all-day labels and combined electricity/power render');
+ for(const [width,height] of [[1920,1080],[1280,720],[960,540],[390,844]]) {
+  frame.style.width=width+'px';frame.style.height=height+'px';await settle();card.fitTV();
+  const shell=root.querySelector('.shell').getBoundingClientRect();
+  assert(shell.right<=width+2,`Horizontal overflow at ${width}`);
+  if(width>=740){assert(shell.bottom<=height+2,`Vertical overflow at ${width}`);assert(root.querySelector('.calendar').getBoundingClientRect().top===root.querySelector('.energy').getBoundingClientRect().top,'Top row alignment');}
+  passed.push(`PASS · ${width} × ${height} layout`);
+ }
+ const original=card._hass;
+ const update=async(events)=>{card.hass={...original,callApi:async()=>events};await card.refreshCalendar(true);};
+ await update([{summary:'<img src=x onerror="alert(1)">',location:'<b>Location</b>',start:{date:'2026-10-23'},end:{date:'2026-10-24'}}]);
+ assert(!root.querySelector('.agenda img')&&!root.querySelector('.agenda b'),'Calendar HTML was not escaped');
+ assert(root.querySelector('.agenda-title').textContent.includes('<img'),'Calendar title missing');passed.push('PASS · remote titles and locations are escaped');
+ await update([]);assert(root.querySelector('.agenda').textContent.includes('No upcoming'),'Empty state missing');
+ card.hass={...original,callApi:async()=>{throw Error('Offline');}};await card.refreshCalendar(true);
+ assert(root.querySelector('.agenda').textContent.includes('unavailable'),'Error state missing');
+ card.setConfig({...config,calendar_entity:''});assert(root.querySelector('.agenda').textContent.includes('Choose a Home Assistant calendar'),'Unconfigured state missing');
+ passed.push('PASS · empty, failed and unconfigured calendar states');
+ card.hass=original;card.setConfig(config);await card.refreshCalendar(true);
+ result.textContent=passed.join('\n')+'\nAll checks passed. Sample data only.';
+} catch(error){result.textContent=passed.join('\n')+'\nFAIL · '+error.message;}
+</script></html>

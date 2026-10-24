@@ -2,7 +2,7 @@
 
 A local Home Assistant dashboard with automatic TV browser launching or casting. Homeboard turns an idle screen into a home overview, then stays out of the way when you open another app.
 
-The dashboard includes today's electricity prices with high/low intervals, live power consumption, mean indoor temperature, weather forecast, door lock status, scenes, and configurable Netflix / SVT Play / TV4 Play shortcuts. Every entity, app activity, TV destination, and price mapping is configurable.
+The dashboard includes today's electricity prices with high/low intervals, live power consumption in the electricity card, upcoming calendar events, mean indoor temperature, weather forecast, door lock status, scenes, and configurable Netflix / SVT Play / TV4 Play shortcuts. Every entity, app activity, TV destination, and price mapping is configurable.
 
 **Status:** initial implementation. JavaScript/data tests and isolated Python policy/controller tests run without Home Assistant. The preview uses explicitly labeled sample data. A real Home Assistant installation and physical TVs are still needed to verify pairing, actual playback reporting, Cast, LG browser compatibility, app links, and the configuration flow end to end.
 
@@ -29,7 +29,7 @@ Once the repository is published:
 If you manage **resources** in YAML, add the resource below to your existing `lovelace.resources` list instead. Homeboard logs a reminder and leaves YAML resource configuration under your control:
 
 ```yaml
-- url: /homeboard_tv/0.3.0/homeboard-tv-card.js
+- url: /homeboard_tv/0.4.0/homeboard-tv-card.js
   type: module
 ```
 
@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.3.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.4.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.3.0.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.4.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -150,6 +150,8 @@ The visual card editor provides entity selectors for price, power, temperature s
 | `current_price_factor` | Conversion for the sensor's numeric state when no current interval exists; default `1`. The same `price_offset` is added. |
 | `price_unit` | Display label, e.g. `SEK/kWh`; must match the configured conversion. |
 | `power_entity` | Instantaneous consumption sensor; W becomes kW above 1,000 W. Other units are preserved. Use power, not accumulated kWh. |
+| `calendar_entity` | Home Assistant `calendar.*` entity to show, including remote calendars already synced to HA. Empty by default; choose in the visual editor. |
+| `calendar_days`, `calendar_max_events` | Look ahead 1–31 days (default 7); show 1–10 events (default 3). |
 | `temperature_entities`, `temperature_unit` | Mean of valid Celsius/Fahrenheit readings, converted to `°C` or `°F`. Missing/incompatible values are excluded and the reporting count is shown. |
 | `weather_entity`, `forecast_type` | Forecast subscription; choose `daily`, `hourly`, or `twice_daily` supported by your provider. |
 | `lock_entities` | Read-only lock states. Unknown locks never count as secured. |
@@ -162,7 +164,7 @@ The visual card editor provides entity selectors for price, power, temperature s
 
 Scene icons supported: `sun`, `moon`, `tv`, `bolt`, `home`, `scene`, `temp`, `lock`, `shield`, `cloud`, `rain`, `cast`, `power`.
 
-**TV formatting:** wide layout uses six balanced cards: compact electricity, power and mean temperature across the first row, weather/locks/scenes in the second row, and app shortcuts below. Electricity uses a small trend chart rather than a dominant panel. Exact low/high intervals remain available in chart tooltips and its accessible description; the expanded narrow-screen layout also lists them below the chart. A compact landscape layout is used on lower-height receivers, including Cast’s smaller logical browser sizes such as 960×540. With `tv_mode: true`, landscape cards at least 740px wide retain three columns instead of switching to the mobile full-width electricity layout. TV mode applies an additional fit to the available viewport so the supplied configuration stays on one screen, compensating its layout width before scaling to avoid a narrow centered dashboard. TV mode uses the full card width, including on 4K receivers; embedded and mobile layouts keep their normal width rules. Prefer a dedicated view with roughly four scenes and a small set of door locks; many more items will reduce the fitted text size. Disable your TV's overscan if it crops display edges. The supplied view uses a four-column-spanning section rather than a single narrow section or Cast's unsupported `panel: true` mode.
+**TV formatting:** wide layout uses six balanced cards: combined electricity pricing/live power, upcoming calendar events and mean temperature across the first row, weather/locks/scenes in the second row, and app shortcuts below. Electricity uses a small trend chart rather than a dominant panel. Exact low/high intervals remain available in chart tooltips and its accessible description; the expanded narrow-screen layout also lists them below the chart. A compact landscape layout is used on lower-height receivers, including Cast’s smaller logical browser sizes such as 960×540. With `tv_mode: true`, landscape cards at least 740px wide retain three columns instead of switching to the mobile full-width electricity layout. TV mode applies an additional fit to the available viewport so the supplied configuration stays on one screen, compensating its layout width before scaling to avoid a narrow centered dashboard. TV mode uses the full card width, including on 4K receivers; embedded and mobile layouts keep their normal width rules. Prefer a dedicated view with roughly four scenes and a small set of door locks; many more items will reduce the fitted text size. Disable your TV's overscan if it crops display edges. The supplied view uses a four-column-spanning section rather than a single narrow section or Cast's unsupported `panel: true` mode.
 
 ### Electricity data
 
@@ -181,6 +183,14 @@ raw_today:
 Timestamps must include their offset/time zone. The adapter filters by the configured local date, accepts negative and zero prices, supports both hourly and quarter-hour intervals, and preserves 23/25-hour daylight-saving days. It computes a duration-weighted daily average over available intervals. The lower quarter and upper quarter of today's interval prices are highlighted. The cheapest and most expensive individual interval times and values appear beneath the chart. Gaps are not interpolated; malformed/overlapping rows are ignored. Plain arrays of 24 numbers are intentionally not assumed to describe a day accurately across DST.
 
 The **official Nord Pool integration** needs an adapter because its current-price sensor does not contain a full price array. `examples/nordpool-package.yaml` requests today's intervals periodically using `nordpool.get_prices_for_date`, converts MWh prices to kWh, and exposes an `intervals` attribute. Set the card's `price_entity` to that generated sensor and `price_attribute: intervals`; leave `price_factor: 1`. Replace the Nord Pool config entry and price area. Old intervals from yesterday are not rendered on a new day if fetching fails. Follow the official [Nord Pool action reference](https://www.home-assistant.io/actions/nordpool.get_prices_for_date/).
+
+### Calendar
+
+Choose **calendar entity** in Edit dashboard → Edit card, or set `calendar_entity: calendar.family` in YAML. Connect your remote calendar to Home Assistant first; Homeboard uses the existing entity and HA authentication. No calendar URL or additional credentials are needed in the card.
+
+The panel lists ongoing and upcoming events in chronological order, with titles, dates, times and optional locations. All-day events retain their calendar dates, with exclusive end dates; timed events use the card's `time_zone` and `locale`. The default is three events over the next seven days. Increase `calendar_days` or `calendar_max_events` in the editor if needed; more events reduce fitted text size on TVs. The panel is read only.
+
+Events are fetched on connection, selection changes, calendar state changes and every five minutes through HA's [calendar REST endpoint](https://developers.home-assistant.io/docs/api/rest/). Remote-provider sync timing still depends on its HA integration. Loading, no events, no selection and unavailable/error states are shown separately; failed requests clear old events.
 
 ### Scenes and apps
 
@@ -214,7 +224,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.3.0.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.4.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

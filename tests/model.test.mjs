@@ -47,3 +47,32 @@ test('Scenes only claim active when an explicit tracking helper is on',()=>{
  assert.equal(sceneStatus(states,{entity:'scene.a',active_entity:'binary_sensor.missing'}),'Status unavailable');
 });
 test('Entity names are escaped before rendering',()=>assert.equal(esc('<img src=x onerror="x">'), '&lt;img src=x onerror=&quot;x&quot;&gt;'));
+
+test('Calendar events preserve all-day dates, exclude ended events and sort/limit upcoming items',async()=>{
+ const {calendarEvents}=await import('../custom_components/homeboard_tv/frontend/model.mjs');
+ const now=new Date('2026-10-24T23:30:00-07:00');
+ const config={time_zone:'America/Los_Angeles',calendar_days:7,calendar_max_events:3};
+ const rows=calendarEvents([
+  {summary:'Tomorrow',start:{date:'2026-10-25'},end:{date:'2026-10-26'}},
+  {summary:'Ended',start:{date:'2026-10-23'},end:{date:'2026-10-24'}},
+  {summary:'Today',start:{date:'2026-10-24'},end:{date:'2026-10-25'}},
+  {summary:'Ongoing',start:{dateTime:'2026-10-24T23:00:00-07:00'},end:{dateTime:'2026-10-25T00:30:00-07:00'}},
+  {summary:'Later',start:'2026-10-26T09:00:00-07:00',end:'2026-10-26T10:00:00-07:00'},
+  {summary:'Outside',start:{date:'2026-11-12'},end:{date:'2026-11-13'}},
+  null,{}, {start:'bad',end:'bad'}, {start:{date:'2026-02-30'},end:{date:'2026-03-02'}}
+ ],config,now);
+ assert.deepEqual(rows.map(r=>r.summary),['Today','Ongoing','Tomorrow']);
+ assert.equal(rows[0].start,'2026-10-24');assert.equal(rows[0].allDay,true);
+ assert.equal(rows[1].allDay,false);
+ assert.deepEqual(calendarEvents(null,config,now),[]);
+});
+test('Timed calendar events handle DST offsets and exclusive end boundaries',async()=>{
+ const {calendarEvents}=await import('../custom_components/homeboard_tv/frontend/model.mjs');
+ const rows=calendarEvents([
+  {summary:'Second',start:{dateTime:'2026-10-25T02:30:00+01:00'},end:{dateTime:'2026-10-25T03:00:00+01:00'}},
+  {summary:'First',start:{dateTime:'2026-10-25T02:30:00+02:00'},end:{dateTime:'2026-10-25T03:00:00+01:00'}},
+  {summary:'Ended',start:'2026-10-25T01:00:00+02:00',end:'2026-10-25T02:00:00+02:00'},
+  {start:'2026-10-25T10:00:00Z',end:'2026-10-25T09:00:00Z'}
+ ],{},new Date('2026-10-25T02:00:00+02:00'));
+ assert.deepEqual(rows.map(r=>r.summary),['First','Second']);
+});

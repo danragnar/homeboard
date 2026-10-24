@@ -1,5 +1,10 @@
 # Changes
 
+## 0.4.0
+
+- Add a configurable Home Assistant calendar panel with upcoming timed/all-day events, locations, a look-ahead window and event limit. Refresh on calendar state changes and every five minutes.
+- Combine live household power consumption with electricity prices, retaining the six-card TV layout.
+
 ## 0.3.0
 
 - Add TV browser transport to each screen's integration options. Open a full dashboard URL through Android TV Remote instead of Cast, using the same auto-dashboard switch, stable idle delay, cooldown, and app grace.

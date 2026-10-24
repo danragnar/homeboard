@@ -33,6 +33,10 @@ views:
             price_offset: 0
             price_unit: SEK/kWh
             power_entity: sensor.home_power
+            # Any calendar already connected to Home Assistant (e.g. remote/ICS).
+            calendar_entity: calendar.family
+            calendar_days: 7
+            calendar_max_events: 3
             temperature_unit: °C
             temperature_entities:
               - sensor.living_room_temperature

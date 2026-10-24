@@ -1,4 +1,4 @@
-import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, lockSummary, sceneStatus, zonedDate} from './model.mjs';
+import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, lockSummary, sceneStatus, zonedDate, calendarEvents} from './model.mjs';
 import {navigationKey, directionalTarget} from './navigation.mjs';
 import {patchHTML} from './dom.mjs';
 import {styles} from './styles.mjs';
@@ -6,6 +6,7 @@ import {styles} from './styles.mjs';
 const paths = {
  home:'M3 10 12 3l9 7M5 9v12h14V9M9 21v-7h6v7',
  bolt:'m13 2-9 12h7l-1 8 10-12h-7l1-8',
+ calendar:'M3 5h18v16H3ZM7 3v4m10-4v4M3 10h18M7 14h2m4 0h4m-10 3h2',
  power:'M12 2v10M6 5a9 9 0 1 0 12 0',
  temp:'M9 14.5V5a3 3 0 0 1 6 0v9.5a5 5 0 1 1-6 0ZM12 8v9',
  sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5',
@@ -27,6 +28,7 @@ const weatherIcon = condition => /rain|pour|lightning/.test(condition) ? 'rain' 
 export class HomeboardTVCard extends HTMLElement {
   constructor() {
     super(); this.attachShadow({mode:'open'}); this._config = {...DEFAULT_CONFIG};
+    this._calendarEvents = []; this._calendarGeneration = 0;
     this._forecast = []; this._weatherGeneration = 0; this._selectedTV = 0; this._busy = false; this._notice = '';
     this._onResize = () => this.scheduleFit();
     this._onKey = event => this.navigate(event);
@@ -66,16 +68,21 @@ export class HomeboardTVCard extends HTMLElement {
     for (const scene of next.scenes) if (!scene || !scene.entity?.startsWith('scene.')) throw new Error('Each scene needs a scene.entity_id in entity');
     for (const app of next.apps) if (!app || !app.name || !app.activity) throw new Error('Each app needs name and activity');
     if (!['aurora','forest'].includes(next.theme)) throw new Error('theme must be aurora or forest');
+    if (next.calendar_entity && (typeof next.calendar_entity !== 'string' || !/^calendar\.[a-z0-9_]+$/.test(next.calendar_entity))) throw new Error('calendar_entity must be a calendar entity ID');
+    for (const [key,max] of [['calendar_days',31],['calendar_max_events',10]]) {
+      if (!Number.isInteger(next[key]) || next[key] < 1 || next[key] > max) throw new Error(`${key} must be an integer from 1 to ${max}`);
+    }
     this._config = next;
     this.setAttribute('theme', next.theme);
     this._selectedTV = Math.min(this._selectedTV, Math.max(0,next.tvs.length-1));
-    if (this._hass && this.isConnected) this.subscribeWeather();
+    if (this._hass && this.isConnected) { this.subscribeWeather(); this.refreshCalendar(); }
     this.render();
   }
   set hass(hass) {
     const previous = this._hass; this._hass = hass;
     if (this.isConnected && (!previous || previous.connection !== hass.connection)) this.subscribeWeather();
-    const ids = new Set([this._config.price_entity,this._config.power_entity,this._config.weather_entity,
+    if (this.isConnected && (!previous || previous.connection !== hass.connection || previous.connected !== hass.connected || previous.states?.[this._config.calendar_entity] !== hass.states?.[this._config.calendar_entity])) this.refreshCalendar(true);
+    const ids = new Set([this._config.price_entity,this._config.power_entity,this._config.weather_entity,this._config.calendar_entity,
       ...this._config.temperature_entities,...this._config.lock_entities,
       ...this._config.scenes.flatMap(scene => [scene.entity,scene.active_entity]),
       ...this._config.tvs.map(tv => tv.auto_entity)].filter(Boolean));
@@ -150,8 +157,8 @@ export class HomeboardTVCard extends HTMLElement {
     window.addEventListener('resize', this._onResize);
     window.addEventListener('keydown', this._onKey, true);
     window.addEventListener('keyup', this._onKeyUp, true);
-    this._timer = setInterval(() => { if (!this._drawer) this.render(); }, 30000);
-    if (this._hass) this.subscribeWeather();
+    this._timer = setInterval(() => { this.refreshCalendar(); if (!this._drawer) this.render(); }, 30000);
+    if (this._hass) { this.subscribeWeather(); this.refreshCalendar(); }
     this.render();
   }
   disconnectedCallback() {
@@ -160,7 +167,8 @@ export class HomeboardTVCard extends HTMLElement {
     window.removeEventListener('keydown', this._onKey, true);
     window.removeEventListener('keyup', this._onKeyUp, true);
     cancelAnimationFrame(this._fitFrame);
-    clearInterval(this._timer); this._weatherGeneration++;
+    clearInterval(this._timer); this._weatherGeneration++; this._calendarGeneration++;
+    this._calendarKey = null; this._calendarPending = false;
     this._weatherUnsub?.(); this._weatherUnsub = null; this._weatherKey = null;
   }
   remoteControls() {
@@ -236,6 +244,53 @@ export class HomeboardTVCard extends HTMLElement {
       this._weatherError = error.message || 'Forecast unavailable'; this.render();
     }
   }
+  async refreshCalendar(force = false) {
+    const {calendar_entity:entity, calendar_days:days, time_zone:zone} = this._config;
+    const connection = this._hass?.connection;
+    const key = `${entity}/${days}/${zone}`;
+    const changed = key !== this._calendarKey || connection !== this._calendarConnection;
+    if (changed) {
+      this._calendarGeneration++; this._calendarEvents = []; this._calendarError = '';
+      this._calendarPending = false; this._calendarFetched = null;
+      this._calendarKey = key; this._calendarConnection = connection;
+    }
+    if (!entity || !this.isConnected || !this._hass || this._hass.connected === false) return;
+    if (this._calendarPending && !changed) { if (force) this._calendarRefreshQueued = true; return; }
+    if (!force && this._calendarFetched !== null && this._calendarFetched !== undefined && Date.now()-this._calendarFetched < 300000) return;
+    const generation = ++this._calendarGeneration;
+    this._calendarPending = true; this._calendarRefreshQueued = false; this._calendarError = '';
+    const start = this.now, end = new Date(+start + days*86400000);
+    const query = new URLSearchParams({start:start.toISOString(), end:end.toISOString()});
+    try {
+      const events = await this._hass.callApi('GET', `calendars/${encodeURIComponent(entity)}?${query}`);
+      if (generation !== this._calendarGeneration || !this.isConnected) return;
+      if (!Array.isArray(events)) throw new Error('Invalid calendar response');
+      this._calendarEvents = events;
+    } catch {
+      if (generation !== this._calendarGeneration || !this.isConnected) return;
+      this._calendarEvents = []; this._calendarError = 'Calendar unavailable. Check the entity and its connection.';
+    } finally {
+      if (generation === this._calendarGeneration && this.isConnected) {
+        this._calendarPending = false; this._calendarFetched = Date.now(); this.render();
+        if (this._calendarRefreshQueued) this.refreshCalendar(true);
+      }
+    }
+  }
+  calendarWhen(event) {
+    const options = {weekday:'short', day:'numeric', month:'short'};
+    const date = event.allDay
+      ? new Date(`${event.start}T12:00:00Z`).toLocaleDateString(this._config.locale, {...options,timeZone:'UTC'})
+      : new Date(event.start).toLocaleDateString(this._config.locale, {...options,timeZone:this._config.time_zone});
+    if (event.allDay) {
+      const last = new Date(Date.parse(event.end)-86400000);
+      const range = last.toISOString().slice(0,10) > event.start
+        ? '–'+last.toLocaleDateString(this._config.locale, {...options,timeZone:'UTC'}) : '';
+      return `${date}${range} · All day`;
+    }
+    const endDate = zonedDate(new Date(event.start),this._config.time_zone) !== zonedDate(new Date(event.end),this._config.time_zone)
+      ? new Date(event.end).toLocaleDateString(this._config.locale, {...options,timeZone:this._config.time_zone})+' ' : '';
+    return `${date} · ${this.time(event.start)}–${endDate}${this.time(event.end)}`;
+  }
   get now() { return this.demoNow ? new Date(this.demoNow) : new Date(); }
   time(date, options = {}) { return date ? new Date(date).toLocaleTimeString(this._config.locale, {timeZone:this._config.time_zone,hour:'2-digit',minute:'2-digit',...options}) : '—'; }
   fmt(value,digits=1) { return number(value,digits,this._config.locale); }
@@ -278,6 +333,7 @@ export class HomeboardTVCard extends HTMLElement {
     const showKW=powerUnit==='W' && powerValue!==null && Math.abs(powerValue)>=1000;
     const temp=temperatureMean(states,c.temperature_entities,c.temperature_unit);
     const weather=states[c.weather_entity];
+    const agenda=calendarEvents(this._calendarEvents,c,now), calendar=states[c.calendar_entity];
     const locks=lockSummary(states,c.lock_entities);
     const tv=this.tv(), auto=tv?.auto_entity ? states[tv.auto_entity] : null;
     const period=(row,high=false)=>`<div class="period"><div><div class="period-label">${high?'↗ Highest':'↘ Lowest'}</div><div class="period-time">${row?`${esc(this.time(row.start))}–${esc(this.time(row.end))}`:'—'}</div></div><div class="period-price ${high?'high':''}">${this.fmt(row?.value,3)}<small>${esc(c.price_unit)}</small></div></div>`;
@@ -292,10 +348,12 @@ export class HomeboardTVCard extends HTMLElement {
       ${this._notice?`<div class="notice" role="status">${esc(this._notice)}<button data-action="dismiss" aria-label="Dismiss notification">×</button></div>`:''}
       <main class="grid">
         <section class="card energy"><div class="card-head"><span class="card-title">${icon('bolt')} Today's electricity</span><span class="pill ${band==='high'?'high':band==='neutral'?'neutral':''}"><i class="dot"></i>${band==='low'?'Lower price':band==='high'?'Higher price':band==='neutral'?'Price overview':'Typical price'}</span></div>
-          <div class="price-value">${this.fmt(current,3)}<span class="unit">${esc(c.price_unit)}</span></div><div class="energy-description">${rows.length?`Today's time-weighted average ${this.fmt(summary.average,3)} ${esc(c.price_unit)} · ${rows.length} intervals`:'No interval data · configure the price source in the card editor'}</div>
+          <div class="energy-values"><div><div class="energy-label">Price now</div><div class="price-value">${this.fmt(current,3)}<span class="unit">${esc(c.price_unit)}</span></div></div><div class="power-now"><div class="energy-label">${icon('power',12)} Power right now</div><div class="power-value">${this.fmt(showKW?powerValue/1000:powerValue,showKW?2:powerUnit==='W'?0:2)}<span class="unit">${esc(showKW?'kW':powerUnit)}</span></div><div class="power-note">${powerValue===null?'Choose a power sensor':'Live consumption'}</div></div></div><div class="energy-description">${rows.length?`Today's time-weighted average ${this.fmt(summary.average,3)} ${esc(c.price_unit)} · ${rows.length} intervals`:'No interval data · configure the price source in the card editor'}</div>
           <div class="chart">${this.renderChart(rows,summary)}</div><div class="legend"><span><i></i>Lower quarter</span><span><i class="expensive"></i>Upper quarter</span><span><i class="now"></i>Now</span></div><div class="periods">${period(summary.low)}${period(summary.high,true)}</div>
         </section>
-        <section class="card metric"><div class="card-head"><span class="card-title">${icon('power')} Power right now</span><span class="reduced">LIVE</span></div><div class="stat-line"><div class="stat-number">${this.fmt(showKW?powerValue/1000:powerValue,showKW?2:powerUnit==='W'?0:2)}<span class="unit">${esc(showKW?'kW':powerUnit)}</span></div><div class="mini-icon">${icon('bolt',24)}</div></div><div class="metric-note">${powerValue===null?'Choose an instantaneous power sensor':'Current household consumption'}</div></section>
+        <section class="card calendar"><div class="card-head"><span class="card-title">${icon('calendar')} Coming up</span><span class="reduced">NEXT ${c.calendar_days} DAYS</span></div><div class="calendar-source">${esc(calendar?.attributes?.friendly_name || c.calendar_entity || 'Your calendar')}</div>
+          <div class="agenda">${!c.calendar_entity?'<div class="empty">Choose a Home Assistant calendar in the card editor.</div>':this._calendarError || !calendar || ['unknown','unavailable'].includes(calendar.state)?`<div class="empty">${esc(this._calendarError || 'Calendar unavailable. Check the entity and its connection.')}</div>`:agenda.length?agenda.map(event=>`<div class="agenda-event"><div class="agenda-when">${esc(this.calendarWhen(event))}</div><div class="agenda-title">${esc(event.summary)}</div>${event.location?`<div class="agenda-location">${esc(event.location)}</div>`:''}</div>`).join(''):`<div class="empty">${this._calendarPending?'Loading events…':'No upcoming events.'}</div>`}</div>
+        </section>
         <section class="card metric"><div class="card-head"><span class="card-title">${icon('temp')} Inside, on average</span></div><div class="stat-line"><div class="stat-number">${this.fmt(temp.value)}<span class="unit">${esc(c.temperature_unit)}</span></div><div class="mini-icon">${icon('home',24)}</div></div><div class="metric-note">${temp.count} of ${temp.total} temperature sensors reporting</div><div class="temperature-strip">${Array.from({length:Math.max(1,temp.total)},(_,i)=>`<i class="${i<temp.count?'filled':''}"></i>`).join('')}</div></section>
         <section class="card weather"><div class="card-head"><span class="card-title">${icon('sun')} A look outside</span><span class="reduced">${esc(c.weather_location || c.home_name)}</span></div><div class="forecast-current"><div><div class="weather-temp">${this.fmt(weather?.attributes?.temperature,0)}<span class="unit">${esc(weather?.attributes?.temperature_unit||c.temperature_unit)}</span></div><div class="condition">${esc((weather?.state === 'partlycloudy' ? 'Partly cloudy' : (weather?.state || 'Weather not configured').replaceAll('-',' ')))}</div></div><div class="weather-symbol">${icon(weatherIcon(weather?.state || ''),48)}</div></div>
           <div class="forecast">${forecast.length?forecast.map(f=>`<div class="forecast-day">${esc(c.forecast_type==='hourly'?this.time(f.datetime):new Date(f.datetime).toLocaleDateString(c.locale,{timeZone:c.time_zone,weekday:'short'}))}${icon(weatherIcon(f.condition||''),20)}<strong>${this.fmt(f.temperature,0)}°</strong>${f.templow!==undefined?`<small>${this.fmt(f.templow,0)}°</small>`:''}</div>`).join(''):`<div class="empty" style="grid-column:1/-1;padding:0">${esc(this._weatherError || 'Choose a weather entity for the forecast.')}</div>`}</div>
@@ -373,6 +431,9 @@ class HomeboardTVEditor extends HTMLElement {
       {name:'price_entity',selector:{entity:{domain:'sensor'}}},{name:'price_attribute',selector:{text:{}}},
       {name:'price_unit',selector:{text:{}}},{name:'price_factor',selector:{number:{mode:'box',step:'any'}}},{name:'price_offset',selector:{number:{mode:'box',step:'any'}}},
       {name:'power_entity',selector:{entity:{domain:'sensor'}}},
+      {name:'calendar_entity',selector:{entity:{domain:'calendar'}}},
+      {name:'calendar_days',selector:{number:{min:1,max:31,mode:'box'}}},
+      {name:'calendar_max_events',selector:{number:{min:1,max:10,mode:'box'}}},
       {name:'temperature_entities',selector:{entity:{domain:'sensor',multiple:true}}},
       {name:'temperature_unit',selector:{select:{options:['°C','°F']}}},
       {name:'weather_entity',selector:{entity:{domain:'weather'}}},

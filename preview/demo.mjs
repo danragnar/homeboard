@@ -1,4 +1,4 @@
-import '../custom_components/homeboard_tv/frontend/homeboard-tv-card.js?preview=0.2.9';
+import '../custom_components/homeboard_tv/frontend/homeboard-tv-card.js?preview=0.4.0';
 import {DEFAULT_CONFIG} from '../custom_components/homeboard_tv/frontend/model.mjs';
 const card=document.querySelector('homeboard-tv-card');
 card.demoMode=true;
@@ -14,6 +14,7 @@ const states={
  'sensor.kitchen_temperature':state(21.3,{unit_of_measurement:'°C'}),
  'sensor.bedroom_temperature':state(20.8,{unit_of_measurement:'°C'}),
  'sensor.office_temperature':state(21.5,{unit_of_measurement:'°C'}),
+ 'calendar.family':state('off',{friendly_name:'Family calendar'}),
  'weather.home':state('partlycloudy',{temperature:9,temperature_unit:'°C'}),
  'lock.front_door':state('locked',{friendly_name:'Front door'}),
  'lock.back_door':state('locked',{friendly_name:'Back door'}),
@@ -24,14 +25,21 @@ const states={
  'switch.lg_auto_dashboard':state('off',{status:'disabled'}),
 };
 const config={...DEFAULT_CONFIG,edge_to_edge:true,home_name:'Our home',weather_location:'Stockholm',
- price_entity:'sensor.electricity_price',power_entity:'sensor.home_power',
+ price_entity:'sensor.electricity_price',power_entity:'sensor.home_power',calendar_entity:'calendar.family',
  temperature_entities:['sensor.living_temperature','sensor.kitchen_temperature','sensor.bedroom_temperature','sensor.office_temperature'],weather_entity:'weather.home',lock_entities:['lock.front_door','lock.back_door'],
  scenes:[{entity:'scene.evening',name:'Evening',icon:'sun',active_entity:'binary_sensor.evening_active'},{entity:'scene.movie',name:'Movie night',icon:'tv'},{entity:'scene.bright',name:'Bright & focused',icon:'bolt'},{entity:'scene.goodnight',name:'Good night',icon:'moon'}],
  tvs:[{name:'Living room · Google TV',entry_id:'demo-google',auto_entity:'switch.living_room_auto_dashboard'},{name:'Bedroom · LG TV',entry_id:'demo-lg',auto_entity:'switch.lg_auto_dashboard',launch_apps:false}]
 };
 try { card.setConfig(JSON.parse(localStorage.getItem('homeboard-demo-config')) || config); }
 catch { card.setConfig(config); }
-const hass={states,connected:true,connection:{async subscribeMessage(callback){
+const hass={states,connected:true,async callApi(method,path){
+ if(method!=='GET' || !path.startsWith('calendars/calendar.family?')) throw new Error('Demo calendar not available');
+ return [
+  {summary:'Dinner with friends',start:{dateTime:'2026-10-22T19:00:00+02:00'},end:{dateTime:'2026-10-22T21:00:00+02:00'},location:'At home'},
+  {summary:'Autumn break',start:{date:'2026-10-23'},end:{date:'2026-10-24'}},
+  {summary:'Swimming',start:{dateTime:'2026-10-24T10:00:00+02:00'},end:{dateTime:'2026-10-24T11:00:00+02:00'}}
+ ];
+},connection:{async subscribeMessage(callback){
  callback({forecast:Array.from({length:5},(_,i)=>({datetime:`2026-10-${22+i}T12:00:00+02:00`,condition:['partlycloudy','rainy','cloudy','sunny','partlycloudy'][i],temperature:[10,9,8,11,10][i],templow:[5,6,4,3,5][i]}))}); return ()=>{};
 }},async callService(domain,service,data){
  if(domain==='scene') {

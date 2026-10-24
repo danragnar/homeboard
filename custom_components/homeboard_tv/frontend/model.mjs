@@ -62,12 +62,37 @@ export function sceneStatus(states, scene, config = {}) {
   if (!value || ["unknown","unavailable"].includes(value)) return "Not tracked";
   return Number.isFinite(Date.parse(value)) ? "Last used " + new Date(value).toLocaleTimeString(config.locale || "en-GB", {hour:"2-digit",minute:"2-digit",timeZone:config.time_zone || "Europe/Stockholm"}) : "Ready";
 }
+// HA REST calendars use {date} for all-day events and {dateTime} for timed ones.
+// Keep date-only values as calendar dates: UTC conversion shifts them in some zones.
+export function calendarEvents(raw, config = {}, now = new Date()) {
+  if (!Array.isArray(raw)) return [];
+  const today = zonedDate(now, config.time_zone || "Europe/Stockholm");
+  const until = new Date(+now + (config.calendar_days || 7) * 86400000);
+  const lastDay = zonedDate(until, config.time_zone || "Europe/Stockholm");
+  const dateOnly = value => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
+  return raw.flatMap(event => {
+    if (!event || typeof event !== "object") return [];
+    const start = event.start?.dateTime ?? event.start?.date ?? event.start;
+    const end = event.end?.dateTime ?? event.end?.date ?? event.end;
+    const allDay = dateOnly(start) && dateOnly(end);
+    if (!allDay && [start,end].some(value => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value))) return [];
+    if (allDay ? end <= start || end <= today || start > lastDay :
+      typeof start !== "string" || typeof end !== "string" || dateOnly(start) || dateOnly(end) ||
+      !Number.isFinite(Date.parse(start)) || !Number.isFinite(Date.parse(end)) ||
+      Date.parse(end) <= Date.parse(start) || Date.parse(end) <= +now || Date.parse(start) >= +until) return [];
+    return [{summary:String(event.summary || "Untitled event"), location:String(event.location || ""), start, end, allDay}];
+  }).sort((a,b) => {
+    const day = event => event.allDay ? event.start : zonedDate(new Date(event.start), config.time_zone || "Europe/Stockholm");
+    return day(a).localeCompare(day(b)) || Number(b.allDay)-Number(a.allDay) || Date.parse(a.start)-Date.parse(b.start);
+  }).slice(0, config.calendar_max_events || 3);
+}
 export const DEFAULT_CONFIG = {
   type:"custom:homeboard-tv-card", title:"A little more at home.", home_name:"Our home",
   tv_mode:true, theme:"aurora", edge_to_edge:false, keyboard_navigation:true, time_zone:"Europe/Stockholm", locale:"en-GB", temperature_unit:"°C", price_unit:"SEK/kWh",
   price_entity:"", price_attribute:"raw_today", price_value_key:"value", price_start_key:"start", price_end_key:"end",
   price_factor:1, price_offset:0, power_entity:"", temperature_entities:[], weather_entity:"", forecast_type:"daily",
-  lock_entities:[], scenes:[], tvs:[], apps:[
+  calendar_entity:"", calendar_days:7, calendar_max_events:3, lock_entities:[], scenes:[], tvs:[], apps:[
     {name:"Netflix", activity:"netflix://", color:"#e50914"},
     {name:"SVT Play", activity:"https://www.svtplay.se", color:"#54cf87"},
     {name:"TV4 Play", activity:"https://www.tv4play.se", color:"#ed3a45"}
