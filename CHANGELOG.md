@@ -1,5 +1,11 @@
 # Changes
 
+## 0.2.8
+
+- Promote edge-to-edge Homeboard to the browser top layer so HA sidebar stacking and ancestor clipping cannot leave navigation above the card.
+- Preserve the same card and sensor updates while expanded; Exit full screen, Escape, and navigation release the top layer. Older engines retain a visible fixed-position fallback.
+- Add an explicit sidebar/header stacking regression fixture and lifecycle tests.
+
 ## 0.2.7
 
 - Keep edge-to-edge Homeboard above Home Assistant’s sidebar layer. Escape and Exit full screen restore access to navigation.

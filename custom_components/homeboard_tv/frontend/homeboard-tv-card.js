@@ -84,7 +84,7 @@ export class HomeboardTVCard extends HTMLElement {
     for (let node = this; node; node = node.parentElement || node.getRootNode()?.host) {
       if (['HUI-CARD-EDIT-MODE','HUI-DIALOG-EDIT-CARD','HA-DIALOG'].includes(node.tagName)) editing = true;
     }
-    this.toggleAttribute('edge-to-edge', Boolean(this._config.tv_mode && this._config.edge_to_edge && !this._exitFullscreen && !editing));
+    this.syncEdgeToEdge(Boolean(this._config.tv_mode && this._config.edge_to_edge && !this._exitFullscreen && !editing));
     const landscape = this._config.tv_mode && this.getBoundingClientRect().width >= 740 && innerWidth / innerHeight >= 1.4;
     this.toggleAttribute('tv-landscape', landscape);
     shell.style.transform = ''; shell.style.width = ''; shell.style.maxWidth = ''; shell.style.margin = '';
@@ -113,6 +113,27 @@ export class HomeboardTVCard extends HTMLElement {
     shell.style.transformOrigin = 'top left';
     card.style.minHeight = '0'; card.style.height = `${Math.ceil(shell.offsetHeight * scale)}px`;
   }
+  syncEdgeToEdge(enabled) {
+    this.toggleAttribute('edge-to-edge', enabled);
+    // A normal fixed element can be trapped in HA's stacking/clipping contexts.
+    // A manual popover promotes this same card above the application chrome,
+    // without moving it out of Lovelace or requiring browser fullscreen access.
+    if (enabled && this.isConnected && typeof this.showPopover === 'function') {
+      if (this.hasAttribute('popover') && !this._edgePopover) return;
+      try {
+        this._edgePopover = true;
+        this.setAttribute('popover', 'manual');
+        if (!this.matches(':popover-open')) this.showPopover();
+      } catch {
+        // Older TV engines retain the fixed-position fallback. Never leave the
+        // card with a closed popover attribute: UA styles would hide it entirely.
+        this.removeAttribute('popover'); this._edgePopover = false;
+      }
+    } else if (this._edgePopover) {
+      try { if (this.matches(':popover-open')) this.hidePopover(); } catch { /* Detached during navigation. */ }
+      this.removeAttribute('popover'); this._edgePopover = false;
+    }
+  }
   connectedCallback() {
     this._resizeObserver.observe(this);
     window.addEventListener('resize', this._onResize);
@@ -122,6 +143,7 @@ export class HomeboardTVCard extends HTMLElement {
     this.render();
   }
   disconnectedCallback() {
+    this.syncEdgeToEdge(false);
     this._resizeObserver.disconnect(); window.removeEventListener('resize', this._onResize);
     window.removeEventListener('keydown', this._onKey);
     cancelAnimationFrame(this._fitFrame);

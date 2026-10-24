@@ -42,3 +42,38 @@ test('Escape returns from edge-to-edge display and disabled navigation leaves ke
  assert.equal(card._exitFullscreen,true); assert.equal(card.fitted,true);
  card._config.keyboard_navigation=false; assert.equal(key('ArrowDown').defaultPrevented,undefined);
 });
+
+function edgeFixture() {
+ const card=Object.create(HomeboardTVCard.prototype), attrs=new Map();
+ card.isConnected=true;
+ card.toggleAttribute=(name,value)=>value?attrs.set(name,''):attrs.delete(name);
+ card.setAttribute=(name,value)=>attrs.set(name,value);
+ card.removeAttribute=name=>attrs.delete(name);
+ card.hasAttribute=name=>attrs.has(name);
+ card.matches=()=>Boolean(card.open);
+ card.showPopover=()=>{card.opens=(card.opens||0)+1;card.open=true;};
+ card.hidePopover=()=>{card.open=false;};
+ return {card,attrs};
+}
+test('Edge-to-edge stays in the top layer across refreshes and restores normal view on exit',()=>{
+ const {card,attrs}=edgeFixture();
+ card.syncEdgeToEdge(true);
+ assert.equal(attrs.get('popover'),'manual'); assert.equal(card.open,true);
+ card.syncEdgeToEdge(true); assert.equal(card.opens,1);
+ card.syncEdgeToEdge(false);
+ assert.equal(card.open,false); assert.equal(attrs.has('popover'),false); assert.equal(attrs.has('edge-to-edge'),false);
+});
+test('Unsupported or rejected top-layer promotion leaves a visible fixed-position fallback',()=>{
+ const {card,attrs}=edgeFixture();
+ card.showPopover=()=>{throw new Error('Unsupported receiver');};
+ card.syncEdgeToEdge(true);
+ assert.equal(attrs.has('edge-to-edge'),true); assert.equal(attrs.has('popover'),false);
+ card.showPopover=undefined; card.syncEdgeToEdge(true); assert.equal(attrs.has('popover'),false);
+});
+test('Other popover owners and disconnected cards are not promoted',()=>{
+ const {card,attrs}=edgeFixture();
+ attrs.set('popover','auto'); card.syncEdgeToEdge(true);
+ assert.equal(attrs.get('popover'),'auto'); assert.equal(card.opens,undefined);
+ attrs.delete('popover'); card.isConnected=false; card.syncEdgeToEdge(true);
+ assert.equal(card.opens,undefined); assert.equal(attrs.has('popover'),false);
+});
