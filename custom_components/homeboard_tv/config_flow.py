@@ -4,6 +4,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 from .const import DEFAULTS, DOMAIN
+from .browser import browser_errors
 
 def schema(values):
     def field(key, default=None, required=False):
@@ -13,7 +14,7 @@ def schema(values):
     entity = lambda domains: selector.EntitySelector(selector.EntitySelectorConfig(domain=domains))
     return vol.Schema({
         field("name", required=True): str,
-        field("mode", required=True): selector.SelectSelector(selector.SelectSelectorConfig(options=["cast", "script"])),
+        field("mode", required=True): selector.SelectSelector(selector.SelectSelectorConfig(options=[{"value":"cast","label":"Google Cast"},{"value":"browser","label":"TV browser"},{"value":"script","label":"Custom script"}])),
         field("playback_entity", required=True): entity("media_player"),
         field("power_entity"): entity("media_player"),
         field("activity_entity"): entity(["remote", "media_player"]),
@@ -25,6 +26,8 @@ def schema(values):
         field("view_path"): str,
         field("dashboard_app"): str,
         field("dashboard_script"): entity("script"),
+        field("browser_url"): str,
+        field("browser_app"): str,
         field("idle_seconds"): vol.All(vol.Coerce(int), vol.Range(min=5, max=3600)),
         field("cooldown_seconds"): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
         field("app_grace_seconds"): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
@@ -34,6 +37,8 @@ def schema(values):
     })
 
 def errors(data):
+    if data["mode"] == "browser":
+        return browser_errors(data)
     if not data.get("activity_entity") and not data.get("idle_guard"):
         return {"base": "missing_guard"}
     if data["mode"] == "script" and not data.get("dashboard_script"):

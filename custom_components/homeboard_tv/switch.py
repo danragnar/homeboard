@@ -22,7 +22,7 @@ class AutoCastSwitch(SwitchEntity, RestoreEntity):
                 "last_error": self.controller.last_error, "dispatching": self.controller.busy,
                 "awaiting_dashboard": self.controller.awaiting_dashboard,
                 "connection_retries": self.controller.connection_retries,
-                **{key: self.controller.config.get(key) for key in ("playback_entity", "power_entity", "activity_entity")}}
+                **{key: self.controller.config.get(key) for key in ("mode", "playback_entity", "power_entity", "activity_entity", "browser_app")}}
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
         if last := await self.async_get_last_state():

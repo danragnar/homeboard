@@ -1,4 +1,4 @@
-"""Event-driven casting with stable-idle debounce and bounded retry."""
+"""Event-driven dashboard dispatch with stable-idle debounce and bounded Cast retry."""
 import asyncio
 import logging
 from time import monotonic
@@ -184,6 +184,8 @@ class Controller:
         self.awaiting_dashboard = False
         try:
             async with self.dispatch_lock:
+                if self.closed or self.reason != "ready":
+                    return  # App/power may have changed while waiting for a launch.
                 if self.config["mode"] == "cast":
                     await self.reset_stale_dashboard(context)
                     if self.closed or self.reason != "ready":
@@ -191,6 +193,13 @@ class Controller:
                     self.awaiting_dashboard = True
                     self.connection_retries = 0
                     await self.show_view(context)
+                elif self.config["mode"] == "browser":
+                    # Same deep-link route validated by the manual TV Bro trial.
+                    # Do not call launch(): its app grace is for leaving Homeboard.
+                    await self.hass.services.async_call("remote", "turn_on", {
+                        "entity_id": self.config["remote_entity"],
+                        "activity": self.config["browser_url"],
+                    }, blocking=True, context=context)
                 else:
                     await self.hass.services.async_call("script", "turn_on", {
                         "entity_id": self.config["dashboard_script"],

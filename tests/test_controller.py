@@ -189,4 +189,65 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.controller.awaiting_dashboard)
         self.assertEqual(len(self.hass.services.calls),1)
 
+class BrowserControllerTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        ControllerTests.setUp(self)
+        self.controller.config.update(mode='browser',browser_url='https://ha.example/homeboard-home/overview',browser_app='com.phlox.tvwebbrowser',power_entity='media_player.screen')
+        self.states['media_player.screen']=SimpleNamespace(state='on',attributes={})
+
+    async def asyncTearDown(self):
+        await self.controller.stop()
+
+    async def test_browser_launch_uses_remote_url_and_no_cast_retry(self):
+        self.states['media_player.cast'].state='off'
+        original=self.hass.services.async_call
+        async def call(*args,**kwargs):
+            await original(*args,**kwargs)
+            self.states['remote.tv'].attributes={'current_activity':'com.phlox.tvwebbrowser'}
+        self.hass.services.async_call=call
+        context=object()
+        await self.controller.cast(context)
+        self.assertEqual(self.hass.services.calls[0][0],('remote','turn_on',{'entity_id':'remote.tv','activity':'https://ha.example/homeboard-home/overview'}))
+        self.assertIs(self.hass.services.calls[0][1]['context'],context)
+        self.assertFalse(self.controller.awaiting_dashboard)
+        self.assertEqual(self.controller.suspended_until,0)
+        self.assertIsNone(self.controller.pending)
+        self.controller.evaluate()
+        self.assertEqual(len(self.hass.services.calls),1)
+
+    async def test_browser_launch_rechecks_after_waiting_for_dispatch_lock(self):
+        await self.controller.dispatch_lock.acquire()
+        task=asyncio.create_task(self.controller.cast())
+        await asyncio.sleep(0)
+        self.states['remote.tv'].attributes={'current_activity':'netflix'}
+        self.controller.dispatch_lock.release()
+        await task
+        self.assertEqual(self.hass.services.calls,[])
+
+    async def test_browser_automatic_delay_cancels_on_tv_off_and_rearms_on_home(self):
+        self.states['media_player.cast'].state='off'
+        self.controller.evaluate()
+        timer=self.hass.timers[-1]
+        self.assertEqual(timer.delay,45)
+        self.states['media_player.screen'].state='off'
+        self.controller.evaluate()
+        self.assertTrue(timer.cancelled)
+        self.assertIsNone(self.controller.pending)
+        self.states['media_player.screen'].state='on'
+        self.controller.evaluate()
+        self.hass.timers[-1].callback(None)
+        await self.controller.task
+        self.assertEqual(len(self.hass.services.calls),1)
+        self.assertGreater(self.hass.timers[-1].delay,298)
+        self.states['remote.tv'].attributes={'current_activity':'com.phlox.tvwebbrowser'}
+        self.controller.evaluate()
+        self.assertIsNone(self.controller.pending)
+
+    async def test_browser_launch_failure_records_error_and_obeys_cooldown(self):
+        self.hass.services.fail=True
+        await self.controller.cast()
+        self.assertEqual(self.controller.last_error,'Receiver unavailable')
+        self.assertFalse(self.controller.awaiting_dashboard)
+        self.assertGreater(self.hass.timers[-1].delay,298)
+
 if __name__=='__main__': unittest.main()

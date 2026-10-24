@@ -10,7 +10,7 @@ show_dashboard:
           integration: homeboard_tv
 launch_app:
   name: Launch Google TV app
-  description: Suspend automatic casting briefly, then launch an activity on the configured Android TV remote.
+  description: Suspend automatic dashboard launches briefly, then launch an activity on the configured Android TV remote.
   fields:
     entry_id:
       name: Screen configuration

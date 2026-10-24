@@ -24,7 +24,7 @@ async def async_setup(hass: HomeAssistant, config):
             if controller.busy:
                 raise ServiceValidationError("A dashboard dispatch is already in progress")
             if controller.reason != "ready":
-                raise ServiceValidationError(f"Cannot cast: {controller.reason}")
+                raise ServiceValidationError(f"Cannot show dashboard: {controller.reason}")
             await controller.cast(call.context, raise_errors=True)
     base = {vol.Required("entry_id"): cv.string}
     hass.services.async_register(DOMAIN, "show_dashboard", handle, schema=vol.Schema(base))

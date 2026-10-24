@@ -116,4 +116,45 @@ class IdlePolicyTests(unittest.TestCase):
         self.config['idle_guard']='binary_sensor.idle'
         self.assertNotEqual(policy.connection_retry_reason(self.config,self.states),'ready')
 
+class BrowserPolicyTests(unittest.TestCase):
+    def setUp(self):
+        IdlePolicyTests.setUp(self)
+        self.config.update(mode="browser",browser_app="com.phlox.tvwebbrowser")
+
+    def test_cast_off_with_powered_screen_and_idle_launcher_is_ready(self):
+        self.states['media_player.cast']=Snapshot('off')
+        self.assertEqual(reason(self.config,self.states),'ready')
+        self.states['media_player.screen']=Snapshot('off')
+        self.assertEqual(reason(self.config,self.states),'screen off')
+
+    def test_browser_already_open_never_relaunches_even_if_in_idle_list(self):
+        self.config['idle_apps']+=',com.phlox.tvwebbrowser'
+        self.states['remote.tv']=Snapshot('on',{'current_activity':'com.phlox.tvwebbrowser'})
+        for state in ['off','idle','playing','paused']:
+            self.states['media_player.cast']=Snapshot(state)
+            self.assertEqual(reason(self.config,self.states),'browser active; page unconfirmed')
+        self.states['media_player.screen']=Snapshot('off')
+        self.assertEqual(reason(self.config,self.states),'screen off')
+
+    def test_streaming_and_unknown_foreground_are_protected(self):
+        for app in [None,'netflix','other.browser']:
+            self.states['remote.tv']=Snapshot('on',{'current_activity':app})
+            for state in ['off','idle','playing','paused']:
+                self.states['media_player.cast']=Snapshot(state)
+                self.assertNotEqual(reason(self.config,self.states),'ready')
+
+    def test_stale_own_cast_session_on_launcher_can_be_replaced_by_browser(self):
+        self.states['media_player.cast']=Snapshot('playing',{'app_name':'Home Assistant Lovelace'})
+        self.assertEqual(reason(self.config,self.states),'ready')
+        self.config.pop('power_entity')
+        self.assertNotEqual(reason(self.config,self.states),'ready')
+
+    def test_other_media_is_never_interrupted_on_launcher(self):
+        for state in ['playing','paused','buffering']:
+            self.states['media_player.cast']=Snapshot(state,{'app_name':'YouTube'})
+            self.assertEqual(reason(self.config,self.states),'media in use')
+
+    def test_browser_has_no_cast_connection_retries(self):
+        self.assertEqual(policy.connection_retry_reason(self.config,self.states),'not Cast transport')
+
 if __name__ == '__main__': unittest.main()

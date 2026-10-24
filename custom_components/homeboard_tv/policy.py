@@ -24,11 +24,16 @@ def idle_reason(config: dict, states: Mapping[str, Snapshot], enabled=True, susp
     activity_id = config.get("activity_entity")
     activity = states.get(activity_id) if activity_id else None
     current = activity.attributes.get(config.get("activity_attribute", "current_activity")) if activity else None
+    mode = config.get("mode", "cast")
+    browser_app = config.get("browser_app", "com.phlox.tvwebbrowser")
+    if mode == "browser" and activity and activity.state not in OFFLINE and current == browser_app:
+        # Foreground confirms the browser, not its URL, login, or rendered page.
+        return "browser active; page unconfirmed"
     allowed = {app.strip() for app in config.get("idle_apps", "").split(",") if app.strip()}
     known_idle_activity = bool(activity and activity.state not in OFFLINE and current and current in allowed)
     # 'off' on a Cast media player means no receiver app, not necessarily an
     # off TV. Require both the real screen's power and its idle foreground app.
-    receiver_idle = bool(config.get("mode", "cast") == "cast" and playback.state == "off"
+    receiver_idle = bool(mode in {"cast", "browser"} and playback.state == "off"
                          and power and power in states and states[power].state not in OFFLINE
                          and known_idle_activity)
     if playback.state in OFFLINE and not receiver_idle:
@@ -37,8 +42,8 @@ def idle_reason(config: dict, states: Mapping[str, Snapshot], enabled=True, susp
     # Google TV can retain a 'playing' HA Cast session after returning home.
     # Only our own dashboard may bypass stale playback, with independent proof
     # that an explicitly allowed launcher/screensaver is in the foreground.
-    stale_dashboard = config.get("mode", "cast") == "cast" and own_dashboard and known_idle_activity and bool(power)
-    if own_dashboard and not stale_dashboard:
+    stale_dashboard = mode in {"cast", "browser"} and own_dashboard and known_idle_activity and bool(power)
+    if mode == "cast" and own_dashboard and not stale_dashboard:
         return "dashboard reported" if playback.attributes.get("media_title") else "receiver active; dashboard unconfirmed"
     if playback.state in {"playing", "paused", "buffering"} and not stale_dashboard:
         return "media in use"
@@ -59,6 +64,8 @@ def idle_reason(config: dict, states: Mapping[str, Snapshot], enabled=True, susp
 
 def connection_retry_reason(config, states, enabled=True, suspended=False):
     """Retry only an untitled HA receiver in a verified Cast foreground app."""
+    if config.get("mode", "cast") != "cast":
+        return "not Cast transport"
     playback = states.get(config.get("playback_entity"))
     if not playback or playback.attributes.get("app_name") != config.get("dashboard_app", "Home Assistant Lovelace"):
         return "receiver changed"

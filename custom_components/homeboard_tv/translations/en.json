@@ -4,34 +4,41 @@
     "step": {
       "user": {
         "title": "Add a screen",
-        "description": "Use a Cast playback entity with an Android TV foreground app entity. For LG script transport, supply an explicit idle guard. Unknown or unavailable signals block casting.",
+        "description": "Google TV: keep its Cast entity for playback detection and select the Android TV Remote for foreground activity. Browser mode opens the full dashboard URL through the remote; power and activity signals are required. Unknown or unavailable idle signals block automatic launches.",
         "data": {
           "name": "Screen name",
           "mode": "Dashboard transport",
           "playback_entity": "Playback entity (use Google Cast for Google TV)",
-          "power_entity": "Screen power entity (recommended for always-on receivers)",
+          "power_entity": "Screen power entity (required for browser transport)",
           "activity_entity": "Foreground app entity (Google TV: select the Remote, not Media player)",
           "activity_attribute": "Foreground app attribute",
           "idle_apps": "Allowed idle app IDs (comma separated)",
-          "idle_guard": "Additional safe-to-cast guard (on = safe)",
-          "remote_entity": "Android TV remote for app launching",
+          "idle_guard": "Additional idle guard (on = safe to show dashboard)",
+          "remote_entity": "Android TV remote for browser and app launching",
           "dashboard_path": "Dashboard URL path",
           "view_path": "View URL path",
-          "dashboard_app": "Dashboard app name (prevents recasting)",
+          "dashboard_app": "Cast dashboard app name (Cast transport)",
           "dashboard_script": "Dashboard opening script (script transport)",
           "idle_seconds": "Stable idle delay (seconds)",
           "cooldown_seconds": "Minimum dispatch interval (seconds)",
           "app_grace_seconds": "Grace after launching an app (seconds)",
           "cast_retry_seconds": "Cast connection retry delay (seconds)",
           "cast_retry_limit": "Cast connection retries (0 disables)",
-          "cast_receiver_apps": "Cast receiver foreground app IDs (comma separated)"
+          "cast_receiver_apps": "Cast receiver foreground app IDs (comma separated)",
+          "browser_url": "Full dashboard URL (browser transport)",
+          "browser_app": "Browser foreground app ID (TV Bro: com.phlox.tvwebbrowser)"
         }
       }
     },
     "error": {
       "missing_guard": "Select a foreground app entity or an idle guard. Idle playback alone cannot detect native apps.",
       "missing_script": "Select a script to open the dashboard.",
-      "missing_path": "Set both the dashboard and view URL paths."
+      "missing_path": "Set both the dashboard and view URL paths.",
+      "missing_remote": "Select the Android TV remote used to open the browser.",
+      "missing_activity": "Select a foreground app entity so Homeboard can avoid reopening the browser or interrupting other apps.",
+      "missing_power": "Select the actual TV screen power entity. A Cast receiver can stay online with the screen off.",
+      "invalid_browser_url": "Enter the full HTTP or HTTPS dashboard URL without embedded username/password credentials.",
+      "missing_browser_app": "Enter the browser foreground app ID."
     }
   },
   "options": {
@@ -42,29 +49,37 @@
           "name": "Screen name",
           "mode": "Dashboard transport",
           "playback_entity": "Playback entity (use Google Cast for Google TV)",
-          "power_entity": "Screen power entity (recommended for always-on receivers)",
+          "power_entity": "Screen power entity (required for browser transport)",
           "activity_entity": "Foreground app entity (Google TV: select the Remote, not Media player)",
           "activity_attribute": "Foreground app attribute",
           "idle_apps": "Allowed idle app IDs (comma separated)",
-          "idle_guard": "Additional safe-to-cast guard (on = safe)",
-          "remote_entity": "Android TV remote for app launching",
+          "idle_guard": "Additional idle guard (on = safe to show dashboard)",
+          "remote_entity": "Android TV remote for browser and app launching",
           "dashboard_path": "Dashboard URL path",
           "view_path": "View URL path",
-          "dashboard_app": "Dashboard app name (prevents recasting)",
+          "dashboard_app": "Cast dashboard app name (Cast transport)",
           "dashboard_script": "Dashboard opening script (script transport)",
           "idle_seconds": "Stable idle delay (seconds)",
           "cooldown_seconds": "Minimum dispatch interval (seconds)",
           "app_grace_seconds": "Grace after launching an app (seconds)",
           "cast_retry_seconds": "Cast connection retry delay (seconds)",
           "cast_retry_limit": "Cast connection retries (0 disables)",
-          "cast_receiver_apps": "Cast receiver foreground app IDs (comma separated)"
-        }
+          "cast_receiver_apps": "Cast receiver foreground app IDs (comma separated)",
+          "browser_url": "Full dashboard URL (browser transport)",
+          "browser_app": "Browser foreground app ID (TV Bro: com.phlox.tvwebbrowser)"
+        },
+        "description": "Google TV: keep its Cast entity for playback detection and select the Android TV Remote for foreground activity. Browser mode opens the full dashboard URL through the remote; power and activity signals are required. Unknown or unavailable idle signals block automatic launches."
       }
     },
     "error": {
       "missing_guard": "Select a foreground app entity or an idle guard. Idle playback alone cannot detect native apps.",
       "missing_script": "Select a script to open the dashboard.",
-      "missing_path": "Set both the dashboard and view URL paths."
+      "missing_path": "Set both the dashboard and view URL paths.",
+      "missing_remote": "Select the Android TV remote used to open the browser.",
+      "missing_activity": "Select a foreground app entity so Homeboard can avoid reopening the browser or interrupting other apps.",
+      "missing_power": "Select the actual TV screen power entity. A Cast receiver can stay online with the screen off.",
+      "invalid_browser_url": "Enter the full HTTP or HTTPS dashboard URL without embedded username/password credentials.",
+      "missing_browser_app": "Enter the browser foreground app ID."
     }
   }
 }

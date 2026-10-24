@@ -1,6 +1,6 @@
 # Homeboard TV
 
-A local Home Assistant dashboard and automatic TV casting integration. Homeboard turns an idle screen into a home overview, then stays out of the way when you open another app.
+A local Home Assistant dashboard with automatic TV browser launching or casting. Homeboard turns an idle screen into a home overview, then stays out of the way when you open another app.
 
 The dashboard includes today's electricity prices with high/low intervals, live power consumption, mean indoor temperature, weather forecast, door lock status, scenes, and configurable Netflix / SVT Play / TV4 Play shortcuts. Every entity, app activity, TV destination, and price mapping is configurable.
 
@@ -29,7 +29,7 @@ Once the repository is published:
 If you manage **resources** in YAML, add the resource below to your existing `lovelace.resources` list instead. Homeboard logs a reminder and leaves YAML resource configuration under your control:
 
 ```yaml
-- url: /homeboard_tv/0.2.9/homeboard-tv-card.js
+- url: /homeboard_tv/0.3.0/homeboard-tv-card.js
   type: module
 ```
 
@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.2.9`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.3.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.2.9.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.3.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -81,6 +81,28 @@ Inspect the remote's `current_activity` while on the home launcher. Put those ex
 If the Cast receiver remains online with the TV powered off, set `power_entity` to an entity that reflects the actual screen's power. This avoids using an always-on Chromecast to wake an off screen through HDMI-CEC. A physical TV can only be treated as offline if you supply a signal that actually reports that condition.
 
 Home Assistant Cast requires an HTTPS HA address reachable from the receiver, including working name resolution and a trusted certificate. Configure the HA external URL (Home Assistant Cloud is one option). Cast must be able to load the custom module resource. If you already set custom HTTP CORS rules, ensure `https://cast.home-assistant.io` is allowed. Do not add credentials to URLs or disable authentication. See the official [Cast action](https://www.home-assistant.io/actions/cast.show_lovelace_view/) and [Cast FAQ](https://cast.home-assistant.io/faq.html).
+
+### Replace automatic Cast with TV Bro
+
+Install Homeboard **0.3.0 or newer** and restart Home Assistant. Open **Settings → Devices & services → Homeboard TV → Configure** on the **existing screen entry**. Change these options:
+
+| Option | Value |
+| --- | --- |
+| Dashboard transport | **TV browser** |
+| Full dashboard URL | Your complete URL, e.g. `https://ha.example/homeboard-home/overview` |
+| Browser foreground app ID | `com.phlox.tvwebbrowser` for TV Bro |
+| Android TV remote | The remote paired to Google TV |
+| Foreground app entity / attribute | The same remote / `current_activity` |
+| Screen power entity | The physical TV's power entity, independent of the Cast receiver |
+| Playback entity | Keep the Google Cast media player for playback protection |
+
+Keep the existing allowed launcher/screensaver IDs and timing options. Do not add TV Bro or streaming apps to the idle list. Keep the existing auto-dashboard switch enabled; no additional automation or duplicate integration entry is needed. The card's TV `entry_id`, sensors, scenes, and app shortcuts remain the same.
+
+Homeboard sends the full URL using Android TV Remote's `remote.turn_on` activity support. TV Bro must be installed, handle dashboard links, and have a working signed-in HA session; select **Keep me logged in** during its one-time sign-in. Homeboard does not transfer Cast credentials to the browser. Enable TV Bro's Direct navigation mode for Homeboard's arrow/OK controls after testing it on your TV. The Cast dashboard/view path and connection-retry settings are unused in Browser mode.
+
+To verify: return to the Google TV home screen while the physical TV is on, wait the configured stable-idle delay (45 seconds by default), and check that TV Bro opens the dashboard. The existing cooldown and app-launch grace period can extend that wait. Test a streaming app and TV-off state too: neither should trigger a browser launch. The switch reports **browser active; page unconfirmed** when TV Bro is foreground; this cannot prove which page is loaded or whether the session is authenticated. If TV Bro is already open, Homeboard leaves it alone, including other pages.
+
+**TV Bro limitation:** incoming dashboard URLs can open new tabs. Homeboard prevents relaunches while the browser is foreground, but returning to the launcher and triggering another launch may add a tab. A new tab may also require Direct navigation to be enabled again. TV Bro supports a same-tab Android Intent extra, but Android TV Remote's documented URL launch does not expose Intent extras; Homeboard does not assume that an `intent://` workaround works. See [TV Bro's URL handling](https://github.com/truefedex/tv-bro/blob/master/app/src/main/java/com/phlox/tvwebbrowser/activity/main/MainActivity.kt) and [Android TV Remote activities](https://www.home-assistant.io/integrations/androidtv_remote/#launching-apps).
 
 ## LG television
 
@@ -104,7 +126,7 @@ Defaults: **45 seconds stable idle**, **5 minutes between automatic attempts**, 
 3. Require every configured guard to agree: allowed launcher app and/or an idle guard in `on`. Missing or unknown signals block casting.
 4. Wait for the stable idle delay. Unrelated attribute updates do not postpone it. Busy/offline events cancel it.
 5. Recheck all conditions immediately before dispatching the configured view or script.
-6. Keep a visible dashboard session. If the Cast entity still reports the configured dashboard app while an independent foreground entity reports an allowed launcher/screensaver and the screen power entity is online, close that stale HA receiver, wait up to 10 seconds for it to close, recheck all guards, then cast the configured view. This only closes the Cast receiver app; it does not turn off the physical screen. Inspect the Cast entity's `app_name` and override `dashboard_app` if needed.
+6. Keep a visible dashboard session. In Cast mode, if the Cast entity still reports the configured dashboard app while an independent foreground entity reports an allowed launcher/screensaver and the screen power entity is online, close that stale HA receiver, wait up to 10 seconds for it to close, recheck all guards, then cast the configured view. This only closes the Cast receiver app; it does not turn off the physical screen. In Browser mode, the same verified launcher state permits opening the URL directly; an already-active browser is never reopened. Inspect the Cast entity's `app_name` and override `dashboard_app` if needed.
 7. Failed or still-idle dispatches can retry after the cooldown. The switch exposes the last error; this is an attempt interval, not an infinite tight retry loop.
 
 App launches cancel pending casts, start the grace period, and use the configured Android TV remote. A timer reevaluates when grace expires even without another entity event. Foreground detection continues protecting app browsing after grace expires. Turning the auto-dashboard switch off persists across HA restarts.
@@ -192,7 +214,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.2.9.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.3.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

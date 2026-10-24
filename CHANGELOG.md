@@ -1,5 +1,12 @@
 # Changes
 
+## 0.3.0
+
+- Add TV browser transport to each screen's integration options. Open a full dashboard URL through Android TV Remote instead of Cast, using the same auto-dashboard switch, stable idle delay, cooldown, and app grace.
+- Require browser URL, remote, foreground app, and screen power configuration; retain Cast playback protection and launcher-only takeover. Never reopen the browser while it is foreground.
+- Keep Cast connection retries exclusive to Cast transport and expose transport/browser diagnostics. Foreground browser status explicitly leaves the page unconfirmed.
+- Document migration of an existing Cast entry to TV Bro, retained authentication, physical-TV checks, and TV Bro's new-tab/direct-navigation limitation.
+
 ## 0.2.9
 
 - Preserve interactive DOM elements across live data updates and notices, retaining browser focus and native selector state. Skip unrelated HA entity updates and cache price interval parsing.
