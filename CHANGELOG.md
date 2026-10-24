@@ -1,5 +1,10 @@
 # Changes
 
+## 0.2.4
+
+- Preserve the full card width when fitting the TV dashboard into a short viewport; anchor it at the upper left instead of shrinking it into the center.
+- Remove the desktop content-width cap in TV mode while preserving normal embedded/mobile layout behavior.
+
 ## 0.2.3
 
 - Distinguish a launched Cast receiver from a dashboard title reported by the receiver.

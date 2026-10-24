@@ -76,17 +76,31 @@ export class HomeboardTVCard extends HTMLElement {
   fitTV() {
     const card = this.shadowRoot.querySelector('ha-card'), shell = this.shadowRoot.querySelector('.shell');
     if (!card || !shell) return;
-    shell.style.transform = ''; card.style.height = ''; card.style.minHeight = '';
+    shell.style.transform = ''; shell.style.width = ''; shell.style.maxWidth = ''; shell.style.margin = '';
+    card.style.height = ''; card.style.minHeight = '';
     // Fit the complete dashboard inside the actual space below HA's own header.
     // Keep natural scrolling on phones and narrow desktop panels.
     if (!this._config.tv_mode || this.getBoundingClientRect().width < 950) return;
     const available = innerHeight - Math.max(0, this.getBoundingClientRect().top) - 14;
-    const natural = shell.offsetHeight;
-    if (available < 300 || !natural) return;
-    const scale = Math.min(1, available / natural);
+    if (available < 300) return;
+    const width = card.clientWidth;
+    if (!width) return;
+    shell.style.maxWidth = 'none'; shell.style.margin = '0';
+    shell.style.width = '100%';
+    let scale = 1;
+    // Compensate the layout width before scaling so a short screen does not
+    // turn the dashboard into a narrow island in the middle of a wide TV.
+    for (let pass = 0; pass < 4; pass++) {
+      const natural = shell.offsetHeight;
+      if (!natural) return;
+      const next = Math.min(scale, available / natural);
+      if (Math.abs(next - scale) < .001) break;
+      scale = next;
+      shell.style.width = `${100 / scale}%`;
+    }
     shell.style.transform = `scale(${scale})`;
-    shell.style.transformOrigin = 'top center';
-    card.style.minHeight = '0'; card.style.height = `${Math.ceil(natural * scale)}px`;
+    shell.style.transformOrigin = 'top left';
+    card.style.minHeight = '0'; card.style.height = `${Math.ceil(shell.offsetHeight * scale)}px`;
   }
   connectedCallback() {
     this._resizeObserver.observe(this);
