@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Homeboard music checks</title><style>body{font:14px system-ui;background:#17283e;color:white}pre{white-space:pre-wrap}iframe{border:0;position:absolute;left:0;top:220px;transform:scale(.2);transform-origin:top left}</style><h1>Music shortcuts and layout checks</h1><pre id="result">Running…</pre><iframe title="Sample dashboard" src="./dashboard.html"></iframe><script type="module">
+const result=document.querySelector('#result'),frame=document.querySelector('iframe'),passed=[];
+const assert=(ok,message)=>{if(!ok)throw Error(message);};
+const settle=()=>new Promise(r=>setTimeout(r,100));
+try {
+ await new Promise(r=>frame.addEventListener('load',r,{once:true}));await settle();
+ const card=frame.contentDocument.querySelector('homeboard-tv-card'),root=card.shadowRoot;
+ assert(root.querySelectorAll('.music-playlist').length===3,'Sample playlists missing');
+ assert(root.querySelector('.music-destination').textContent.includes('Living room speakers'),'Playback destination missing');
+ for(const action of ['music-play','music-open','music-playlist']) {
+  root.querySelector(`[data-action="${action}"]`).click();await settle();
+  assert(root.querySelector('.notice').textContent.includes('simulated'),'Demo action not simulated');
+ }
+ card._notice='';card.render();
+ passed.push('PASS · sample playlists, destination and simulated play/open actions');
+ const config=card._config;
+ card.setConfig({...config,tvs:[{...config.tvs[0],music_assistant_url:'https://music.example/#/home'}]});
+ assert(root.querySelector('[data-action="music-tv"]'),'Open on TV missing');
+ root.querySelector('[data-action="music-tv"]').click();await settle();
+ assert(root.querySelector('.notice').textContent.includes('simulated'),'TV browser launch not simulated');card._notice='';card.render();
+ for(const [width,height] of [[1920,1080],[1280,720],[960,540],[390,844]]) {
+  frame.style.width=width+'px';frame.style.height=height+'px';await settle();card.fitTV();
+  const shell=root.querySelector('.shell').getBoundingClientRect();
+  assert(shell.right<=width+2,`Horizontal overflow at ${width}`);
+  if(width>=740) assert(shell.bottom<=height+2,`Vertical overflow at ${width}`);
+  assert(card.remoteControls().includes(root.querySelector('[data-action="music-play"]')),'Play unavailable to remote navigation');
+  passed.push(`PASS · music layout and remote controls at ${width} × ${height}`);
+ }
+ card.setConfig({...config,music_assistant:null});assert(!root.querySelector('.music'),'Optional box not hidden');
+ passed.push('PASS · optional music box hides without configuration');
+ result.textContent=passed.join('\n')+'\nAll checks passed. Sample data only.';
+} catch(error){result.textContent=passed.join('\n')+'\nFAIL · '+error.message;}
+</script></html>

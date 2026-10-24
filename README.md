@@ -29,7 +29,7 @@ Once the repository is published:
 If you manage **resources** in YAML, add the resource below to your existing `lovelace.resources` list instead. Homeboard logs a reminder and leaves YAML resource configuration under your control:
 
 ```yaml
-- url: /homeboard_tv/0.4.1/homeboard-tv-card.js
+- url: /homeboard_tv/0.5.0/homeboard-tv-card.js
   type: module
 ```
 
@@ -63,11 +63,38 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.4.1`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.5.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.4.1.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.5.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
+
+## Music Assistant shortcuts
+
+The optional music box has separate **Play** and **Open** actions for each saved playlist, **Open Music Assistant** for the full interface, and an optional **Open on TV** button. Add this in the card editor's advanced JSON (as a `music_assistant` object) or in Lovelace YAML:
+
+```yaml
+music_assistant:
+  url: https://music.example/#/home?player=Livingroom
+  player_entity: media_player.music_assistant_living_room
+  playlists:
+    - name: Evening favourites
+      media_id: library://playlist/42
+      # Optional: paste the actual playlist page URL from Music Assistant.
+      url: https://music.example/REPLACE_WITH_COPIED_PLAYLIST_PAGE
+    - name: Weekend mornings
+      media_id: spotify://playlist/REPLACE_WITH_PLAYLIST_ID
+```
+
+Replace every example destination. Install the [Music Assistant HA integration](https://www.home-assistant.io/integrations/music_assistant/) and select **its** media player entity. Play calls [`music_assistant.play_media`](https://www.home-assistant.io/actions/music_assistant.play_media/) with `media_type: playlist` and `enqueue: replace`: it starts that playlist and replaces the player's queue. The destination is shown above the playlists, independently of the TV selector. Missing/unavailable players disable Play. Use a Music Assistant library URI or a provider URI from your installation. A playlist may have only `media_id` (Play), only `url` (Open), or both. No music is played when the dashboard loads.
+
+Open navigates **the browser displaying the card**. For Music Assistant installed as a Home Assistant app, `url` can instead be your actual sidebar path starting with `/`; Homeboard navigates within HA, whose sidebar loads the authenticated interface. Copy the actual sidebar path from your installation rather than using a temporary `/api/hassio_ingress/...` session URL. An absolute Music Assistant URL opens its web interface in the same browser and needs its own working login. Playlist links only navigate; they do not auto-play. Copy their exact URLs from Music Assistant. [Music Assistant documents URLs](https://www.music-assistant.io/faq/how-to/) for selecting a player, opening playlists, and showing Now Playing, for example `https://music.example/#/home?player=Livingroom&showFullscreenPlayer=true`. Omit `music_assistant` or set it to `null` to hide the box.
+
+To offer **Open on TV**, add `music_assistant_url: https://music.example/#/home?player=Livingroom` to the relevant existing `tvs` item. It must be a full HTTP(S) URL. The button uses that TV entry's existing `homeboard_tv.launch_app` action, Android TV remote and app-launch grace period; `launch_apps: false` hides it. A compatible browser such as TV Bro must be installed, handle the link, and already be signed in. Link routing and Music Assistant's own remote-control usability need testing on the device. For LG without an Android TV remote, use your existing webOS browser script separately.
+
+**Cast and browser displays differ.** [Music Assistant's Google Cast provider](https://www.music-assistant.io/player-support/google-cast/) can play to the TV/Cast player using its Music Assistant Cast receiver and metadata display. That receiver is not the full interactive Music Assistant browser interface. [Home Assistant Cast](https://cast.home-assistant.io/faq.html) displays Lovelace views; this feature does not cast arbitrary Music Assistant web pages or embed its authenticated UI into the receiver. Use Homeboard on a phone/computer to trigger playlist playback, or use a TV browser for the full Music Assistant UI. Playing on the same Cast receiver replaces the dashboard's Cast session. Playing to a separate speaker can leave the TV dashboard visible.
+
+The standalone preview contains sample playlists; links and player actions there are simulated. No real server URLs, playlist IDs or player entities are discovered or configured automatically.
 
 ## Google TV
 
@@ -224,7 +251,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.4.1.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.5.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

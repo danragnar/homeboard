@@ -1,5 +1,11 @@
 # Changes
 
+## 0.5.0
+
+- Add an optional Music Assistant box with playlist playback to an explicit player, playlist links and a full-interface link.
+- Offer an optional browser launch on the selected Android/Google TV through existing app controls; document Cast receiver limitations.
+- Include sample playlists in the local preview; no automatic music playback or UI launch.
+
 ## 0.4.1
 
 - Start a fresh stable-idle delay in Browser mode after observing a foreground app return to an allowed launcher. End the previous app grace and dispatch cooldown only once playback, screen power, and idle guards agree.

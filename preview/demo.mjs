@@ -1,4 +1,4 @@
-import '../custom_components/homeboard_tv/frontend/homeboard-tv-card.js?preview=0.4.0';
+import '../custom_components/homeboard_tv/frontend/homeboard-tv-card.js?preview=0.5.0';
 import {DEFAULT_CONFIG} from '../custom_components/homeboard_tv/frontend/model.mjs';
 const card=document.querySelector('homeboard-tv-card');
 card.demoMode=true;
@@ -14,6 +14,7 @@ const states={
  'sensor.kitchen_temperature':state(21.3,{unit_of_measurement:'°C'}),
  'sensor.bedroom_temperature':state(20.8,{unit_of_measurement:'°C'}),
  'sensor.office_temperature':state(21.5,{unit_of_measurement:'°C'}),
+ 'media_player.demo_music':state('idle',{friendly_name:'Living room speakers · demo'}),
  'calendar.family':state('off',{friendly_name:'Family calendar'}),
  'weather.home':state('partlycloudy',{temperature:9,temperature_unit:'°C'}),
  'lock.front_door':state('locked',{friendly_name:'Front door'}),
@@ -24,7 +25,7 @@ const states={
  'switch.living_room_auto_dashboard':state('on',{status:'dashboard visible'}),
  'switch.lg_auto_dashboard':state('off',{status:'disabled'}),
 };
-const config={...DEFAULT_CONFIG,edge_to_edge:true,home_name:'Our home',weather_location:'Stockholm',
+const config={...DEFAULT_CONFIG,music_assistant:{url:'https://music.example/#/home',player_entity:'media_player.demo_music',playlists:[{name:'Evening favourites',media_id:'library://playlist/demo-evening',url:'https://music.example/#/playlists/demo-evening'},{name:'Weekend mornings',media_id:'library://playlist/demo-weekend',url:'https://music.example/#/playlists/demo-weekend'},{name:'Dinner together',media_id:'library://playlist/demo-dinner',url:'https://music.example/#/playlists/demo-dinner'}]},edge_to_edge:true,home_name:'Our home',weather_location:'Stockholm',
  price_entity:'sensor.electricity_price',power_entity:'sensor.home_power',calendar_entity:'calendar.family',
  temperature_entities:['sensor.living_temperature','sensor.kitchen_temperature','sensor.bedroom_temperature','sensor.office_temperature'],weather_entity:'weather.home',lock_entities:['lock.front_door','lock.back_door'],
  scenes:[{entity:'scene.evening',name:'Evening',icon:'sun',active_entity:'binary_sensor.evening_active'},{entity:'scene.movie',name:'Movie night',icon:'tv'},{entity:'scene.bright',name:'Bright & focused',icon:'bolt'},{entity:'scene.goodnight',name:'Good night',icon:'moon'}],

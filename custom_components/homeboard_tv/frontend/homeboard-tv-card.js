@@ -1,4 +1,4 @@
-import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, lockSummary, sceneStatus, zonedDate, calendarEvents} from './model.mjs';
+import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, lockSummary, sceneStatus, zonedDate, calendarEvents, validateMusic} from './model.mjs';
 import {navigationKey, directionalTarget} from './navigation.mjs';
 import {patchHTML} from './dom.mjs';
 import {styles} from './styles.mjs';
@@ -17,6 +17,7 @@ const paths = {
  scene:'m12 3 2.8 5.7L21 9.8l-4.5 4.4 1 6.3-5.5-3-5.5 3 1-6.3L3 9.8l6.2-1.1Z',
  moon:'M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z',
  settings:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M9 3l-1 3-3 1-2 3 2 2-1 3 3 3 3-1 2 2 3-1 1-3 3-1 2-3-2-2 1-3-3-3-3 1-2-2Z',
+ music:'M9 18V5l12-3v13M9 8l12-3M9 18a3 3 0 1 1-3-3c1.7 0 3 1.3 3 3Zm12-3a3 3 0 1 1-3-3c1.7 0 3 1.3 3 3Z',
  tv:'M3 6h18v14H3ZM8 2l4 4 4-4',
  cast:'M3 3h18v18h-7M3 21v-1m0-4a5 5 0 0 1 5 5M3 11a10 10 0 0 1 10 10',
  arrow:'m9 5 7 7-7 7',
@@ -72,6 +73,7 @@ export class HomeboardTVCard extends HTMLElement {
     for (const [key,max] of [['calendar_days',31],['calendar_max_events',10]]) {
       if (!Number.isInteger(next[key]) || next[key] < 1 || next[key] > max) throw new Error(`${key} must be an integer from 1 to ${max}`);
     }
+    validateMusic(next);
     this._config = next;
     this.setAttribute('theme', next.theme);
     this._selectedTV = Math.min(this._selectedTV, Math.max(0,next.tvs.length-1));
@@ -83,6 +85,7 @@ export class HomeboardTVCard extends HTMLElement {
     if (this.isConnected && (!previous || previous.connection !== hass.connection)) this.subscribeWeather();
     if (this.isConnected && (!previous || previous.connection !== hass.connection || previous.connected !== hass.connected || previous.states?.[this._config.calendar_entity] !== hass.states?.[this._config.calendar_entity])) this.refreshCalendar(true);
     const ids = new Set([this._config.price_entity,this._config.power_entity,this._config.weather_entity,this._config.calendar_entity,
+      this._config.music_assistant?.player_entity,
       ...this._config.temperature_entities,...this._config.lock_entities,
       ...this._config.scenes.flatMap(scene => [scene.entity,scene.active_entity]),
       ...this._config.tvs.map(tv => tv.auto_entity)].filter(Boolean));
@@ -314,6 +317,24 @@ export class HomeboardTVCard extends HTMLElement {
     const labels=indices.map((i,j)=>`<text x="${x(j===4 ? +rows[i].end : +rows[i].start)}" y="149" text-anchor="${j===0?'start':j===4?'end':'middle'}">${esc(this.time(j===4 ? rows[i].end : rows[i].start))}</text>`).join('');
     return `<svg viewBox="0 0 710 159" preserveAspectRatio="none" role="img" aria-label="Today's electricity price. Lowest ${esc(this.fmt(summary.low.value,3))} at ${esc(this.time(summary.low.start))}; highest ${esc(this.fmt(summary.high.value,3))} at ${esc(this.time(summary.high.start))} ${esc(this._config.price_unit)}">${guides}${bars}${labels}</svg>`;
   }
+  musicPanel() {
+    const music = this._config.music_assistant;
+    if (!music) return '';
+    const tv = this.tv(), player = this._hass?.states?.[music.player_entity];
+    const canPlay = Boolean(music.player_entity && player && !['unknown','unavailable'].includes(player.state));
+    const disabled = `aria-disabled="${this._busy}"`;
+    return `<section class="card music"><div class="card-head"><span class="card-title">${icon('music')} Music Assistant</span><div class="music-links">${music.url?`<button class="text-button" data-action="music-open" ${disabled}>Open Music Assistant ${icon('arrow',12)}</button>`:''}${tv?.music_assistant_url && tv.launch_apps!==false?`<button class="text-button" data-action="music-tv" ${disabled}>Open on TV · ${esc(tv.name)} ${icon('tv',12)}</button>`:''}</div></div>
+      <div class="music-destination">${music.player_entity?`Play on ${esc(player?.attributes?.friendly_name || music.player_entity)}${canPlay?'':' · unavailable'}`:'Choose a Music Assistant player to enable playback'}</div>
+      <div class="music-playlists">${(music.playlists || []).map((item,i)=>`<div class="music-playlist"><span class="music-name">${icon('music',16)}${esc(item.name)}</span><div class="music-links">${item.media_id?`<button class="music-play" data-action="music-play" data-index="${i}" aria-label="Play ${esc(item.name)}" ${canPlay?'':'disabled'} ${disabled}>▶ Play</button>`:''}${item.url?`<button class="text-button" data-action="music-playlist" data-index="${i}" aria-label="Open ${esc(item.name)}" ${disabled}>Open ${icon('arrow',12)}</button>`:''}</div></div>`).join('') || '<div class="empty">Add your favourite playlists in the card configuration.</div>'}</div></section>`;
+  }
+  openMusicURL(url) {
+    if (this.demoMode) { this._notice='Demo link simulated. No page or device was opened.'; this.render(); return; }
+    // HA sidebar/Ingress paths use HA navigation; MA's own URLs load in this browser.
+    if (url.startsWith('/')) {
+      history.pushState(null, '', url);
+      window.dispatchEvent(new CustomEvent('location-changed', {detail:{replace:false}}));
+    } else window.location.assign(url);
+  }
   render() {
     if (!this.shadowRoot || this._drawer) return;
     const focus = this.shadowRoot.activeElement;
@@ -361,6 +382,7 @@ export class HomeboardTVCard extends HTMLElement {
         <section class="card security"><div class="card-head"><span class="card-title">${icon('lock')} Peace of mind</span><span class="pill ${locks.secured?'':'amber'}">${locks.items.length?`${locks.items.filter(i=>i.state==='locked').length}/${locks.items.length} secured`:'Not configured'}</span></div><div class="security-title">${icon('shield',31)}<div><strong>${locks.secured?'All doors secured':!locks.items.length?'Add your doors':locks.unknown?'Check door status':'A door needs attention'}</strong><small>Live lock status · view only</small></div></div>${locks.items.length?locks.items.map(lock=>`<div class="lock-row"><span>${esc(lock.name)}</span><span class="lock-state ${lock.state==='locked'?'':'warn'}">${icon('lock',12)}${esc(lock.state.charAt(0).toUpperCase()+lock.state.slice(1))}</span></div>`).join(''):'<div class="empty">Select your lock entities in the card editor.</div>'}</section>
         <section class="card scenes"><div class="card-head"><span class="card-title">${icon('scene')} Set the mood</span><span class="reduced">SCENES</span></div><div class="scene-list">${c.scenes.length?c.scenes.map((scene,i)=>{const status=sceneStatus(states,scene,c);return `<button class="scene ${status==='Active'?'active':''}" data-action="scene" data-index="${i}" aria-disabled="${this._busy}"><span class="scene-top">${icon(scene.icon || 'scene',18)}${status==='Active'?'<i class="dot" style="color:var(--mint)"></i>':''}</span><span class="scene-name">${esc(scene.name || states[scene.entity]?.attributes?.friendly_name || scene.entity)}</span><span class="scene-status">${esc(status)}</span></button>`}).join(''):'<div class="empty">Add scenes and optional activity helpers.</div>'}</div></section>
       </main>
+      ${this.musicPanel()}
       <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app on your selected Google TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps">${c.apps.map((app,i)=>`<button class="app" data-action="app" data-index="${i}" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}"><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>
       <footer class="footer"><div class="live"><i class="dot"></i>${this.demoMode?'Preview · actions are simulated':this._hass?.connected===false?'Home Assistant disconnected':'Connected to Home Assistant'}<span>· ${esc(c.time_zone)}</span></div><div class="footer-actions">${c.edge_to_edge?`<button class="text-button" data-action="fullscreen">${this._exitFullscreen?'Expand dashboard':'Exit full screen'}</button>`:''}${auto?`<span><button class="toggle ${auto.state==='on'?'on':''}" data-action="auto" role="switch" aria-checked="${auto.state==='on'}" aria-label="Automatic dashboard" ${!['on','off'].includes(auto.state)?'disabled':''}></button>Auto dashboard</span>`:''}<button class="text-button" data-action="cast" ${!tv?'disabled':''} aria-disabled="${this._busy}">${icon('cast',12)} Show dashboard</button></div></footer>
     </div></ha-card>`);
@@ -377,8 +399,17 @@ export class HomeboardTVCard extends HTMLElement {
     if(action==='save-demo') { this.saveDemoSettings(); return; }
     if(action==='dismiss') { this._notice=''; this.render(); return; }
     if(this._busy) return;
+    if(action==='music-open') { this.openMusicURL(c.music_assistant.url); return; }
+    if(action==='music-playlist') { this.openMusicURL(c.music_assistant.playlists[index].url); return; }
     this._busy=true; this.render();
     try {
+      if(action==='music-play') {
+        const music=c.music_assistant;
+        const player=this._hass?.states?.[music.player_entity];
+        if (!player || ['unknown','unavailable'].includes(player.state)) throw new Error('Music Assistant player unavailable');
+        await this._hass.callService('music_assistant','play_media',{entity_id:music.player_entity,media_id:music.playlists[index].media_id,media_type:'playlist',enqueue:'replace'});
+      }
+      if(action==='music-tv') await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,activity:this.tv().music_assistant_url});
       if(action==='scene') await this._hass.callService('scene','turn_on',{entity_id:c.scenes[index].entity});
       if(action==='app') await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,activity:c.apps[index].activity});
       if(action==='cast') await this._hass.callService('homeboard_tv','show_dashboard',{entry_id:this.tv().entry_id});
@@ -386,7 +417,7 @@ export class HomeboardTVCard extends HTMLElement {
         const id=this.tv().auto_entity;
         await this._hass.callService('switch',this._hass.states[id]?.state==='on'?'turn_off':'turn_on',{entity_id:id});
       }
-      this._notice = this.demoMode ? 'Demo action simulated. No devices were controlled.' : action==='app'?'App launch requested. Automatic casting is temporarily suspended.':action==='scene'?'Scene activation requested.':action==='cast'?'Dashboard dispatch requested.':'Automatic dashboard updated.';
+      this._notice = this.demoMode ? 'Demo action simulated. No devices were controlled.' : action==='music-play'?'Playlist playback requested.':action==='music-tv'?'Music Assistant browser launch requested on the selected TV.':action==='app'?'App launch requested. Automatic casting is temporarily suspended.':action==='scene'?'Scene activation requested.':action==='cast'?'Dashboard dispatch requested.':'Automatic dashboard updated.';
     } catch(error) { this._notice = `Action failed: ${error.message || error}`; }
     finally {
       this._busy=false; this.render();
@@ -419,7 +450,7 @@ class HomeboardTVEditor extends HTMLElement {
   set hass(hass) { this._hass=hass; const form=this.shadowRoot.querySelector('ha-form'); if(form) form.hass=hass; }
   render() {
     if(!this._config) return;
-    this.shadowRoot.innerHTML='<style>:host{display:block}p{line-height:1.6;color:var(--secondary-text-color)}textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:12px;border-radius:8px;font-family:monospace}button{padding:10px;margin-top:8px}.error{color:var(--error-color)}</style><ha-form></ha-form><p>Advanced configuration: scenes, TVs, apps, and custom price field mappings. Edit the JSON below, then apply.</p><textarea aria-label="Advanced card configuration"></textarea><button>Apply advanced configuration</button><p class="error" role="alert"></p>';
+    this.shadowRoot.innerHTML='<style>:host{display:block}p{line-height:1.6;color:var(--secondary-text-color)}textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:12px;border-radius:8px;font-family:monospace}button{padding:10px;margin-top:8px}.error{color:var(--error-color)}</style><ha-form></ha-form><p>Advanced configuration: Music Assistant URL, player and playlists (music_assistant), scenes, TVs, apps, and custom price field mappings. Edit the JSON below, then apply.</p><textarea aria-label="Advanced card configuration"></textarea><button>Apply advanced configuration</button><p class="error" role="alert"></p>';
     const form=this.shadowRoot.querySelector('ha-form');
     form.hass=this._hass; form.data=this._config;
     form.schema=[

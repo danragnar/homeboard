@@ -68,11 +68,23 @@ views:
                 entry_id: REPLACE_WITH_GOOGLE_TV_CONFIG_ENTRY_ID
                 auto_entity: switch.living_room_auto_dashboard
                 launch_apps: true
+                # Optional full URL, routed to a signed-in TV browser such as TV Bro.
+                # music_assistant_url: https://music.example/#/home?player=Livingroom
               - name: Bedroom · LG TV
                 entry_id: REPLACE_WITH_LG_CONFIG_ENTRY_ID
                 auto_entity: switch.bedroom_auto_dashboard
                 # Enable only if this entry has a Google/Android TV remote.
                 launch_apps: false
+            # Optional. Omit this section to hide the music box.
+            # Replace with your real URL/sidebar path, MA player and playlist URIs.
+            music_assistant:
+              url: https://music.example/#/home?player=Livingroom
+              player_entity: media_player.music_assistant_living_room
+              playlists:
+                - name: Evening favourites
+                  media_id: library://playlist/REPLACE_WITH_PLAYLIST_ID
+                  # Optional: copy the playlist page URL from your MA browser.
+                  # url: https://music.example/REPLACE_WITH_PLAYLIST_PAGE
             apps:
               - name: Netflix
                 activity: netflix://

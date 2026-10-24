@@ -87,12 +87,38 @@ export function calendarEvents(raw, config = {}, now = new Date()) {
     return day(a).localeCompare(day(b)) || Number(b.allDay)-Number(a.allDay) || Date.parse(a.start)-Date.parse(b.start);
   }).slice(0, config.calendar_max_events || 3);
 }
+// Accept HA sidebar paths or ordinary web URLs, never executable URL schemes.
+export function musicURL(value, absolute = false) {
+  if (typeof value !== 'string' || !value || value.trim() !== value || /[\\\s]/.test(value)) return false;
+  if (!absolute && /^\/(?!\/)/.test(value)) return true;
+  try {
+    const url = new URL(value);
+    return ['http:','https:'].includes(url.protocol) && Boolean(url.hostname) && !url.username && !url.password;
+  } catch { return false; }
+}
+export function validateMusic(config) {
+  const music = config.music_assistant;
+  if (music !== undefined && music !== null) {
+    if (typeof music !== 'object' || Array.isArray(music)) throw new Error('music_assistant must be an object');
+    if (music.url && !musicURL(music.url)) throw new Error('music_assistant.url must be an HTTP(S) URL or Home Assistant path');
+    if (music.player_entity && (typeof music.player_entity !== 'string' || !/^media_player\.[a-z0-9_]+$/.test(music.player_entity))) throw new Error('music_assistant.player_entity must be a media_player entity ID');
+    if (music.playlists !== undefined && !Array.isArray(music.playlists)) throw new Error('music_assistant.playlists must be a list');
+    for (const item of music.playlists || []) {
+      if (!item || typeof item.name !== 'string' || !item.name.trim() || (!item.media_id && !item.url)) throw new Error('Each music playlist needs a name and media_id or url');
+      if (item.media_id !== undefined && (typeof item.media_id !== 'string' || !item.media_id.trim())) throw new Error('Playlist media_id must be a nonempty string');
+      if (item.url && !musicURL(item.url)) throw new Error('Playlist url must be an HTTP(S) URL or Home Assistant path');
+    }
+  }
+  for (const tv of config.tvs || []) {
+    if (tv.music_assistant_url && !musicURL(tv.music_assistant_url, true)) throw new Error('TV music_assistant_url must be a full HTTP(S) URL');
+  }
+}
 export const DEFAULT_CONFIG = {
   type:"custom:homeboard-tv-card", title:"A little more at home.", home_name:"Our home",
   tv_mode:true, theme:"aurora", edge_to_edge:false, keyboard_navigation:true, time_zone:"Europe/Stockholm", locale:"en-GB", temperature_unit:"°C", price_unit:"SEK/kWh",
   price_entity:"", price_attribute:"raw_today", price_value_key:"value", price_start_key:"start", price_end_key:"end",
   price_factor:1, price_offset:0, power_entity:"", temperature_entities:[], weather_entity:"", forecast_type:"daily",
-  calendar_entity:"", calendar_days:7, calendar_max_events:3, lock_entities:[], scenes:[], tvs:[], apps:[
+  music_assistant:null, calendar_entity:"", calendar_days:7, calendar_max_events:3, lock_entities:[], scenes:[], tvs:[], apps:[
     {name:"Netflix", activity:"netflix://", color:"#e50914"},
     {name:"SVT Play", activity:"https://www.svtplay.se", color:"#54cf87"},
     {name:"TV4 Play", activity:"https://www.tv4play.se", color:"#ed3a45"}
