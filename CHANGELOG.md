@@ -1,5 +1,9 @@
 # Changes
 
+## 0.2.7
+
+- Keep edge-to-edge Homeboard above Home Assistant’s sidebar layer. Escape and Exit full screen restore access to navigation.
+
 ## 0.2.6
 
 - Brighter Aurora theme with blue, lilac and mint panels, clearer secondary text, and an optional Forest palette.

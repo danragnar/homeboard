@@ -1,6 +1,6 @@
 """Shared configuration for Homeboard TV."""
 DOMAIN = "homeboard_tv"
-VERSION = "0.2.6"
+VERSION = "0.2.7"
 LEGACY_IDLE_APPS = "com.google.android.apps.tv.launcher,com.google.android.tvlauncher"
 DEFAULTS = {
     "name": "Living room",
