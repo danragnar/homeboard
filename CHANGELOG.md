@@ -1,5 +1,11 @@
 # Changes
 
+## 0.2.5
+
+- Keep three balanced columns on landscape Cast receivers with smaller logical viewports, including 960×540.
+- Keep electricity to one compact column rather than the mobile full-width layout.
+- Fit TV mode from 740px card width on landscape displays, and add a 960×540 Cast preview.
+
 ## 0.2.4
 
 - Preserve the full card width when fitting the TV dashboard into a short viewport; anchor it at the upper left instead of shrinking it into the center.

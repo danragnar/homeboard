@@ -76,11 +76,13 @@ export class HomeboardTVCard extends HTMLElement {
   fitTV() {
     const card = this.shadowRoot.querySelector('ha-card'), shell = this.shadowRoot.querySelector('.shell');
     if (!card || !shell) return;
+    const landscape = this._config.tv_mode && this.getBoundingClientRect().width >= 740 && innerWidth / innerHeight >= 1.4;
+    this.toggleAttribute('tv-landscape', landscape);
     shell.style.transform = ''; shell.style.width = ''; shell.style.maxWidth = ''; shell.style.margin = '';
     card.style.height = ''; card.style.minHeight = '';
     // Fit the complete dashboard inside the actual space below HA's own header.
     // Keep natural scrolling on phones and narrow desktop panels.
-    if (!this._config.tv_mode || this.getBoundingClientRect().width < 950) return;
+    if (!landscape) return;
     const available = innerHeight - Math.max(0, this.getBoundingClientRect().top) - 14;
     if (available < 300) return;
     const width = card.clientWidth;
