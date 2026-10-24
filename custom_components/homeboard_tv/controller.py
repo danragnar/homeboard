@@ -4,7 +4,7 @@ import logging
 from time import monotonic
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
-from .policy import Snapshot, idle_reason, connection_retry_reason
+from .policy import OFFLINE, Snapshot, idle_reason, connection_retry_reason
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +25,8 @@ class Controller:
         self.dispatch_lock = asyncio.Lock()
         self.awaiting_dashboard = False
         self.connection_retries = 0
+        self.last_foreground_app = None
+        self.returned_to_launcher = False
 
     def snapshots(self):
         return {key: Snapshot(state.state, state.attributes) for key in self.ids if (state := self.hass.states.get(key))}
@@ -62,9 +64,39 @@ class Controller:
             self.pending = None
 
     @callback
+    def reconcile_browser_return(self):
+        """Treat a verified app-to-launcher return as a fresh browser idle cycle."""
+        if self.config.get("mode") != "browser":
+            return
+        states = self.snapshots()
+        activity = states.get(self.config.get("activity_entity"))
+        power = states.get(self.config.get("power_entity"))
+        current = activity.attributes.get(self.config.get("activity_attribute", "current_activity")) if activity and activity.state not in OFFLINE else None
+        if not self.enabled or not power or power.state in OFFLINE or not current:
+            self.last_foreground_app = None
+            self.returned_to_launcher = False
+            return
+        allowed = {app.strip() for app in self.config.get("idle_apps", "").split(",") if app.strip()}
+        previous = self.last_foreground_app
+        self.last_foreground_app = current
+        if current not in allowed:
+            self.returned_to_launcher = False
+        elif previous and previous not in allowed:
+            self.returned_to_launcher = True
+        if self.returned_to_launcher and idle_reason(self.config, states, self.enabled) == "ready":
+            # An observed app exit ends launch grace. Keep playback/power/guard
+            # checks, and retain cooldown for failed launches on the same home
+            # screen. Only an actual foreground transition opens a new cycle.
+            self.returned_to_launcher = False
+            self.suspended_until = 0
+            self.last_attempt = float("-inf")
+            self.cancel_timer()
+
+    @callback
     def evaluate(self):
         if self.closed:
             return
+        self.reconcile_browser_return()
         reason = self.reason
         self.notify()
         if self.awaiting_dashboard and not self.busy:
@@ -218,6 +250,7 @@ class Controller:
         remote = self.config.get("remote_entity")
         if not remote:
             raise ServiceValidationError("Configure an Android TV remote entity for this TV first")
+        self.returned_to_launcher = False
         self.suspended_until = monotonic() + self.config.get("app_grace_seconds", 600)
         self.awaiting_dashboard = False
         self.cancel_timer()

@@ -1,5 +1,11 @@
 # Changes
 
+## 0.4.1
+
+- Start a fresh stable-idle delay in Browser mode after observing a foreground app return to an allowed launcher. End the previous app grace and dispatch cooldown only once playback, screen power, and idle guards agree.
+- Retain failure cooldowns on the same launcher and fail closed for missing foreground or power signals.
+- Expose foreground app, playback state, and remaining grace/cooldown seconds on the auto-dashboard switch.
+
 ## 0.4.0
 
 - Add a configurable Home Assistant calendar panel with upcoming timed/all-day events, locations, a look-ahead window and event limit. Refresh on calendar state changes and every five minutes.

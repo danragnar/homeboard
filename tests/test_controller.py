@@ -243,6 +243,77 @@ class BrowserControllerTests(unittest.IsolatedAsyncioTestCase):
         self.controller.evaluate()
         self.assertIsNone(self.controller.pending)
 
+    async def test_app_then_home_ends_grace_and_cooldown_and_waits_stable_idle(self):
+        self.states['remote.tv'].attributes={'current_activity':'com.phlox.tvwebbrowser'}
+        self.controller.evaluate()
+        self.controller.last_attempt=controller_module.monotonic()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            await self.controller.launch('tv4://')
+        self.assertEqual(self.controller.reason,'app grace period')
+        self.states['remote.tv'].attributes={'current_activity':'tv4'}
+        self.controller.evaluate()
+        self.assertGreater(self.controller.suspended_until,controller_module.monotonic())
+        self.states['remote.tv'].attributes={'current_activity':'launcher'}
+        self.controller.evaluate()
+        self.assertEqual(self.controller.reason,'ready')
+        self.assertEqual(self.controller.suspended_until,0)
+        self.assertEqual(self.hass.timers[-1].delay,45)
+        timer=self.hass.timers[-1]
+        self.controller.evaluate()
+        self.assertIs(self.hass.timers[-1],timer)
+        timer.callback(None)
+        await self.controller.task
+        self.assertEqual(len(self.hass.services.calls),2)
+        self.assertEqual(self.hass.services.calls[-1][0][2]['activity'],self.controller.config['browser_url'])
+        self.assertGreater(self.hass.timers[-1].delay,298)
+
+    async def test_return_home_waits_for_playback_to_stop_before_ending_grace(self):
+        self.states['remote.tv'].attributes={'current_activity':'tv4'}
+        self.controller.evaluate()
+        self.controller.suspended_until=controller_module.monotonic()+600
+        self.states['media_player.cast'].state='paused'
+        self.states['remote.tv'].attributes={'current_activity':'launcher'}
+        self.controller.evaluate()
+        self.assertEqual(self.controller.reason,'app grace period')
+        self.assertTrue(self.controller.returned_to_launcher)
+        await self.controller.cast()
+        self.assertEqual(self.hass.services.calls,[])
+        self.states['media_player.cast'].state='off'
+        self.controller.evaluate()
+        self.assertEqual(self.controller.reason,'ready')
+        self.assertEqual(self.hass.timers[-1].delay,45)
+
+    async def test_no_verified_app_exit_keeps_launch_grace(self):
+        self.controller.evaluate()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            await self.controller.launch('tv4://')
+        self.controller.evaluate()
+        self.assertEqual(self.controller.reason,'app grace period')
+        self.assertGreater(self.hass.timers[-1].delay,598)
+
+    async def test_browser_then_home_starts_new_idle_cycle_without_old_cooldown(self):
+        self.controller.last_attempt=controller_module.monotonic()
+        self.states['remote.tv'].attributes={'current_activity':'com.phlox.tvwebbrowser'}
+        self.controller.evaluate()
+        self.states['remote.tv'].attributes={'current_activity':'launcher'}
+        self.controller.evaluate()
+        self.assertEqual(self.hass.timers[-1].delay,45)
+
+    async def test_screen_off_or_unknown_activity_does_not_waive_cooldown(self):
+        for missing in ['power','activity']:
+            self.states['remote.tv'].attributes={'current_activity':'tv4'}
+            self.controller.evaluate()
+            if missing=='power':
+                self.states['media_player.screen'].state='off'
+            else:
+                self.states['remote.tv'].attributes={}
+            self.controller.evaluate()
+            self.controller.last_attempt=controller_module.monotonic()
+            self.states['media_player.screen'].state='on'
+            self.states['remote.tv'].attributes={'current_activity':'launcher'}
+            self.controller.evaluate()
+            self.assertGreater(self.hass.timers[-1].delay,298)
+
     async def test_browser_launch_failure_records_error_and_obeys_cooldown(self):
         self.hass.services.fail=True
         await self.controller.cast()
