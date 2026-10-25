@@ -14,6 +14,78 @@ export const styles = `
 :host([tv-landscape]) .calendar{grid-column:auto}
 :host([theme="forest"]){--ink:#ebeee8;--muted:#a9bdb2;--line:#ffffff20;--mint:#c7e7a5;--amber:#e5b36d;--panel:#263c32;--bg:#18291f}
 :host([theme="forest"]) .energy{background:linear-gradient(135deg,#304c3b,#263c32)}
+:host([theme="aurora-green"]){--ink:#effaf4;--muted:#b0cdc2;--line:#c6ffe827;--panel:#22423e;--bg:#132b2a}
+:host([theme="aurora-green"]) .energy{background:linear-gradient(135deg,#2e5c4b,#22423e)}
+:host([theme="aurora-green"]) .calendar{background:linear-gradient(135deg,#26504f,#22423e)}
+:host([theme="aurora-green"]) .metric:nth-child(3){background:linear-gradient(135deg,#3a4a64,#24403f)}
+:host([theme="aurora-green"]) .weather{background:linear-gradient(135deg,#285a5c,#22423e)}
+:host([theme="aurora-green"]) .scene.active{background:#8ff0d024;border-color:#8ff0d080}
+:host([theme="aurora-green"]) .card-title svg{color:#a9f0d6}
+:host([theme="aurora-green"]) .tv-control select{background:#2a4b47}
+:host([theme="aurora-green"][remote-navigation]) button:focus,:host([theme="aurora-green"][remote-navigation]) select:focus,:host([theme="aurora-green"]) button:focus-visible,:host([theme="aurora-green"]) select:focus-visible{box-shadow:0 0 0 7px #132b2a,0 0 0 9px #ffe4a455}
+:host([theme="nordic-green"]){--ink:#f2ead8;--muted:#b7c2b4;--line:#f2ead81f;--mint:#b9d4bf;--amber:#d6a54f;--panel:#22423e;--bg:#132b2a;--chart-now:#f2ead8;--chart-low:#b9d4bf;--chart-high:#d6a54f;--chart-mid:#5f7a6c;--chart-guide:#f2ead812;--chart-text:#b7c2b4}
+:host([theme="nordic-green"]) .energy{background:linear-gradient(135deg,#34584a,#22423e)}
+:host([theme="nordic-green"]) .calendar{background:linear-gradient(135deg,#2b4d4b,#22423e)}
+:host([theme="nordic-green"]) .metric:nth-child(3){background:linear-gradient(135deg,#4a4552,#25403e)}
+:host([theme="nordic-green"]) .weather{background:linear-gradient(135deg,#2c5257,#22423e)}
+:host([theme="nordic-green"]) .pill,:host([theme="nordic-green"]) .mini-icon{background:#b9d4bf14}
+:host([theme="nordic-green"]) .pill.amber,:host([theme="nordic-green"]) .pill.high{background:#d6a54f1a}
+:host([theme="nordic-green"]) .scene.active{background:#b9d4bf1f;border-color:#b9d4bf66}
+:host([theme="nordic-green"]) .scene:hover,:host([theme="nordic-green"]) .app:hover{border-color:#b9d4bf66}
+:host([theme="nordic-green"]) .scene svg,:host([theme="nordic-green"]) .card-title svg{color:#c3cfc0}
+:host([theme="nordic-green"]) .forecast-day svg{color:#b7c2b4}
+:host([theme="nordic-green"]) .forecast-day strong{color:var(--ink)}
+:host([theme="nordic-green"]) .temperature-strip i{background:#b9d4bf30}:host([theme="nordic-green"]) .temperature-strip i.filled{background:var(--mint)}
+:host([theme="nordic-green"]) .tv-control select{background:#2a4b47}
+:host([theme="nordic-green"]) .toggle{background:#46605a}:host([theme="nordic-green"]) .toggle.on{background:var(--mint)}
+:host([theme="nordic-green"]) .toggle.on:after{background:#132b2a}
+:host([theme="nordic-green"]) .notice{background:#d6a54f17;border-color:#d6a54f40}
+:host([theme="nordic-green"][remote-navigation]) button:focus,:host([theme="nordic-green"][remote-navigation]) select:focus,:host([theme="nordic-green"]) button:focus-visible,:host([theme="nordic-green"]) select:focus-visible{outline-color:#e8c88a;box-shadow:0 0 0 7px #132b2a,0 0 0 9px #e8c88a55}
+:host([theme="aurora-teak"]){--ink:#f3ead9;--muted:#d9c8b0;--line:#b0957c40;--mint:#b8c9b6;--amber:#ebb39c;--panel:#22423e;--bg:#132b2a;--chart-now:#fff6e6;--chart-low:#9fe3bd;--chart-high:#c65f38;--chart-mid:#6c9384;--chart-guide:#f3ead912;--chart-text:#d9c8b0}
+:host([theme="aurora-teak"]) .legend i{background:var(--chart-low)}:host([theme="aurora-teak"]) .legend .expensive{background:var(--chart-high)}:host([theme="aurora-teak"]) .legend .now{background:var(--chart-now)}
+:host([theme="aurora-teak"]) .music-play{background:#b4532e;color:#f3ead9;font-weight:600}:host([theme="aurora-teak"]) .music-play:hover{background:#c4623b}
+:host([theme="aurora-teak"]) ha-card{letter-spacing:.2px}:host([theme="aurora-teak"]) .brand,:host([theme="aurora-teak"]) .security-title strong{letter-spacing:0}:host([theme="aurora-teak"]) .greeting{letter-spacing:-.3px}:host([theme="aurora-teak"]) .clock{letter-spacing:-.4px}:host([theme="aurora-teak"]) .price-value{letter-spacing:-.8px}:host([theme="aurora-teak"]) .energy .price-value,:host([theme="aurora-teak"]) .power-value{letter-spacing:-.4px}:host([theme="aurora-teak"]) .stat-number{letter-spacing:-.5px}:host([theme="aurora-teak"]) .weather-temp{letter-spacing:-.4px}:host([theme="aurora-teak"]) .app-mark{letter-spacing:-.3px}
+:host([theme="aurora-teak"]) .weather-symbol,:host([theme="aurora-teak"]) .app-mark svg{color:#c65f38}
+:host([theme="aurora-teak"]) .card{box-shadow:0 12px 32px #0000004d,0 2px 8px #00000033}
+:host([theme="aurora-teak"]) .energy{background:linear-gradient(135deg,#2e5c4b,#22423e)}
+:host([theme="aurora-teak"]) .energy.price-high{background:linear-gradient(135deg,#6e4430,#563527)}
+:host([theme="aurora-teak"]) .calendar{background:linear-gradient(135deg,#26504f,#22423e)}
+:host([theme="aurora-teak"]) .metric:nth-child(3){background:linear-gradient(135deg,#664833,#2c3f36)}
+:host([theme="aurora-teak"]) .weather{background:linear-gradient(135deg,#285a5c,#22423e)}
+:host([theme="aurora-teak"]) .pill,:host([theme="aurora-teak"]) .mini-icon{background:#b8c9b614}
+:host([theme="aurora-teak"]) .pill.amber,:host([theme="aurora-teak"]) .pill.high{background:#ebb39c1f}
+:host([theme="aurora-teak"]) .scene,:host([theme="aurora-teak"]) .music-playlist{background:#4a342540;border-color:#b0957c40}
+:host([theme="aurora-teak"]) .scene.active{background:#6b4e3a99;border-color:#b0957c}
+:host([theme="aurora-teak"]) .scene:hover,:host([theme="aurora-teak"]) .app:hover{border-color:#b0957c}
+:host([theme="aurora-teak"]) .scene svg,:host([theme="aurora-teak"]) .card-title svg{color:#d9c8b0}
+:host([theme="aurora-teak"]) .scene.active svg{color:var(--mint)}
+:host([theme="aurora-teak"]) .forecast-day svg{color:#b8c9b6}
+:host([theme="aurora-teak"]) .forecast-day strong{color:var(--ink)}
+:host([theme="aurora-teak"]) .temperature-strip i{background:#b8c9b630}:host([theme="aurora-teak"]) .temperature-strip i.filled{background:var(--mint)}
+:host([theme="aurora-teak"]) .tv-control select{background:#4a3425;border-color:#b0957c66}
+:host([theme="aurora-teak"]) .icon-button{border-color:#b0957c80}
+:host([theme="aurora-teak"]) .toggle{background:#5a4a3c}:host([theme="aurora-teak"]) .toggle.on{background:var(--mint)}
+:host([theme="aurora-teak"]) .toggle.on:after{background:#132b2a}
+:host([theme="aurora-teak"]) .notice{background:#ebb39c17;border-color:#ebb39c40}
+:host([theme="aurora-teak"][remote-navigation]) button:focus,:host([theme="aurora-teak"][remote-navigation]) select:focus,:host([theme="aurora-teak"]) button:focus-visible,:host([theme="aurora-teak"]) select:focus-visible{outline-color:#ebb39c;box-shadow:0 0 0 7px #132b2a,0 0 0 9px #ebb39c55}
+:host([theme="nordic"]){--ink:#f1eadc;--muted:#b9b6a8;--line:#f1eadc1f;--mint:#a9c4b0;--amber:#d9a85b;--panel:#2c3d4a;--bg:#1c2a36;--chart-now:#f1eadc;--chart-low:#a9c4b0;--chart-high:#d9a85b;--chart-mid:#64766f;--chart-guide:#f1eadc12;--chart-text:#b9b6a8}
+:host([theme="nordic"]) .energy{background:linear-gradient(135deg,#3a5550,#2c3d4a)}
+:host([theme="nordic"]) .calendar{background:linear-gradient(135deg,#33475a,#2c3d4a)}
+:host([theme="nordic"]) .metric:nth-child(3){background:linear-gradient(135deg,#4a4552,#2e3c4a)}
+:host([theme="nordic"]) .weather{background:linear-gradient(135deg,#36506a,#2c3d4a)}
+:host([theme="nordic"]) .pill,:host([theme="nordic"]) .mini-icon{background:#a9c4b014}
+:host([theme="nordic"]) .pill.amber,:host([theme="nordic"]) .pill.high{background:#d9a85b1a}
+:host([theme="nordic"]) .scene.active{background:#a9c4b01c;border-color:#a9c4b066}
+:host([theme="nordic"]) .scene:hover,:host([theme="nordic"]) .app:hover{border-color:#a9c4b066}
+:host([theme="nordic"]) .scene svg,:host([theme="nordic"]) .card-title svg{color:#a7b0ad}
+:host([theme="nordic"]) .forecast-day svg{color:#b3bfb8}
+:host([theme="nordic"]) .forecast-day strong{color:var(--ink)}
+:host([theme="nordic"]) .temperature-strip i{background:#a9c4b033}:host([theme="nordic"]) .temperature-strip i.filled{background:var(--mint)}
+:host([theme="nordic"]) .tv-control select{background:#33475a}
+:host([theme="nordic"]) .toggle{background:#4b5a63}:host([theme="nordic"]) .toggle.on{background:var(--mint)}
+:host([theme="nordic"]) .toggle.on:after{background:#1c2a36}
+:host([theme="nordic"]) .notice{background:#d9a85b17;border-color:#d9a85b40}
+:host([theme="nordic"][remote-navigation]) button:focus,:host([theme="nordic"][remote-navigation]) select:focus,:host([theme="nordic"]) button:focus-visible,:host([theme="nordic"]) select:focus-visible{outline-color:#e8c88a;box-shadow:0 0 0 7px #1c2a36,0 0 0 9px #e8c88a55}
 :host([theme="aurora"]) .calendar{background:linear-gradient(135deg,#2e4668,#293f5b)}
 :host([theme="aurora"]) .metric:nth-child(3){background:linear-gradient(135deg,#494267,#303e59)}
 :host([theme="aurora"]) .weather{background:linear-gradient(135deg,#315576,#293f5b)}
@@ -24,4 +96,49 @@ export const styles = `
 .music{margin-top:14px}.music .card-head{flex-wrap:wrap;gap:8px}.music-destination{font-size:11px;color:var(--muted);margin-top:8px}.music-playlists{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}.music-playlist{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#ffffff06;flex:1 1 240px;min-width:0}.music-name{display:flex;align-items:center;gap:8px;font-size:13px;overflow-wrap:anywhere}.music-links{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.music-play{background:var(--mint);color:var(--bg);border:0;border-radius:7px;padding:8px 12px;white-space:nowrap}.music .empty{padding:4px 0}.music .text-button{color:var(--mint);display:inline-flex;align-items:center;gap:4px}.music-playlist .music-links{flex-shrink:0}
 @media(max-width:600px){.music-playlist{flex-basis:100%}.music .card-head{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+` + warmTheme('linen', {
+  ink:'#33291F', muted:'#6E665B', frame:'#8C8377', line:'#8C837740', main:'#4E5E57', accent:'#9E4F2E', mid:'#B9B2A6',
+  bg:'linear-gradient(135deg,#FBF9F5 0%,#F1ECE4 55%,#E2E8E1 100%)', bgSolid:'#F1ECE4',
+  panel:'linear-gradient(135deg,#FFFFFF,#F7F3EC)', panelSolid:'#FFFFFF', shadow:'0 10px 28px #4a3a2a14,0 2px 6px #4a3a2a0d',
+  surface:'#EFEAE1', today:'#E8ECE7', hot:'linear-gradient(135deg,#FDF4EF,#F8E4DA)', onMain:'#FBF9F5'
+}) + warmTheme('teak', {
+  ink:'#F3EAD9', muted:'#D9C8B0', frame:'#B0957C', line:'#B0957C45', main:'#B8C9B6', accent:'#EBB39C', mid:'#8A7059',
+  bg:'linear-gradient(135deg,#5C4130 0%,#3A2A1F 55%,#2A1F17 100%)', bgSolid:'#3A2A1F',
+  panel:'linear-gradient(135deg,#664833,#523928)', panelSolid:'#5A3F2D', shadow:'0 12px 32px #0000004d,0 2px 8px #00000033',
+  surface:'#4A3425', today:'#6B4E3A', hot:'linear-gradient(135deg,#6E4430,#563527)', onMain:'#2A1F17'
+});
+
+// Linen (day) and Teak (evening): colours and gradients only, so the TV fit scale is unaffected.
+function warmTheme(name, t) {
+  const h = `:host([theme="${name}"])`, remote = `:host([theme="${name}"][remote-navigation])`;
+  return `
+${h}{--ink:${t.ink};--muted:${t.muted};--line:${t.line};--mint:${t.main};--amber:${t.accent};--panel:${t.panelSolid};--bg:${t.bgSolid};--surface:${t.surface};--today:${t.today};--chart-now:${t.ink};--chart-low:${t.main};--chart-high:${t.accent};--chart-mid:${t.mid};--chart-guide:${t.line};--chart-text:${t.muted}}
+${h} ha-card,:host([theme="${name}"][edge-to-edge]){background:${t.bg}}
+${h} .card,${h} .energy{background:${t.panel};border-color:${t.line};box-shadow:${t.shadow}}
+${h} .energy.price-high{background:${t.hot}}
+${h} .scene,${h} .music-playlist,${h} .app,${h} .tv-control select,${h} .mini-icon{background:${t.surface};border-color:${t.line}}
+${h} .scene:hover,${h} .app:hover{background:${t.today};border-color:${t.frame}}
+${h} .scene.active{background:${t.today};border-color:${t.main}}
+${h} .scene svg,${h} .card-title svg{color:${t.muted}}
+${h} .scene.active svg,${h} .brand svg,${h} .security-title svg,${h} .forecast-day svg{color:${t.main}}
+${h} .weather-symbol{color:${t.accent}}
+${h} .forecast-day strong{color:${t.ink}}
+${h} .pill{background:${t.surface};color:${t.main}}
+${h} .pill.amber,${h} .pill.high{background:${t.surface};color:${t.accent}}
+${h} .pill.neutral{background:${t.surface};color:${t.muted}}
+${h} .legend .now{background:${t.ink}}
+${h} .temperature-strip i{background:${t.line}}
+${h} .temperature-strip i.filled{background:${t.main}}
+${h} .brand span:last-child{border-left-color:${t.line}}
+${h} .icon-button{border-color:${t.frame}}
+${h} .icon-button:hover{background:${t.surface}}
+${h} .toggle{background:${t.frame}}
+${h} .toggle.on{background:${t.main}}
+${h} .toggle.on:after{background:${t.onMain}}
+${h} .music-play,${h} .drawer .save{background:${t.main};color:${t.onMain}}
+${h} .notice{background:${t.surface};border-color:${t.accent};color:${t.accent}}
+${h} .drawer{color:${t.ink};background:${t.bgSolid}}
+${h} .drawer input,${h} .drawer select,${h} .drawer textarea{background:${t.surface};color:${t.ink};border-color:${t.line}}
+${remote} button:focus,${remote} select:focus,${h} button:focus-visible,${h} select:focus-visible{outline-color:${t.accent};box-shadow:0 0 0 7px ${t.bgSolid},0 0 0 9px ${t.accent}55}
 `;
+}

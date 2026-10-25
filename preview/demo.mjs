@@ -31,8 +31,9 @@ const config={...DEFAULT_CONFIG,music_assistant:{url:'https://music.example/#/ho
  scenes:[{entity:'scene.evening',name:'Evening',icon:'sun',active_entity:'binary_sensor.evening_active'},{entity:'scene.movie',name:'Movie night',icon:'tv'},{entity:'scene.bright',name:'Bright & focused',icon:'bolt'},{entity:'scene.goodnight',name:'Good night',icon:'moon'}],
  tvs:[{name:'Living room · Google TV',entry_id:'demo-google',auto_entity:'switch.living_room_auto_dashboard'},{name:'Bedroom · LG TV',entry_id:'demo-lg',auto_entity:'switch.lg_auto_dashboard',launch_apps:false}]
 };
-try { card.setConfig(JSON.parse(localStorage.getItem('homeboard-demo-config')) || config); }
-catch { card.setConfig(config); }
+const previewTheme = new URLSearchParams(location.search).get('theme');
+try { const saved = JSON.parse(localStorage.getItem('homeboard-demo-config')) || config; card.setConfig(previewTheme ? {...saved, theme:previewTheme} : saved); }
+catch { card.setConfig(previewTheme ? {...config, theme:previewTheme} : config); }
 const hass={states,connected:true,async callApi(method,path){
  if(method!=='GET' || !path.startsWith('calendars/calendar.family?')) throw new Error('Demo calendar not available');
  return [

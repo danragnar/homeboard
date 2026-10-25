@@ -69,7 +69,7 @@ export class HomeboardTVCard extends HTMLElement {
     for (const tv of next.tvs) if (!tv || !tv.name || !tv.entry_id) throw new Error('Each TV needs a name and entry_id');
     for (const scene of next.scenes) if (!scene || !scene.entity?.startsWith('scene.')) throw new Error('Each scene needs a scene.entity_id in entity');
     for (const app of next.apps) if (!app || !app.name || !app.activity) throw new Error('Each app needs name and activity');
-    if (!['aurora','forest'].includes(next.theme)) throw new Error('theme must be aurora or forest');
+    if (!['aurora','aurora-green','aurora-teak','nordic-green','forest','nordic','linen','teak'].includes(next.theme)) throw new Error('theme must be aurora, aurora-green, aurora-teak, nordic-green, forest, nordic, linen or teak');
     if (next.calendar_entity && (typeof next.calendar_entity !== 'string' || !/^calendar\.[a-z0-9_]+$/.test(next.calendar_entity))) throw new Error('calendar_entity must be a calendar entity ID');
     for (const [key,max] of [['calendar_days',31],['calendar_max_events',10]]) {
       if (!Number.isInteger(next[key]) || next[key] < 1 || next[key] > max) throw new Error(`${key} must be an integer from 1 to ${max}`);
@@ -372,7 +372,7 @@ export class HomeboardTVCard extends HTMLElement {
       <section class="heading"><div><div class="eyebrow">YOUR EVERYDAY, AT A GLANCE</div><h1 class="greeting">${esc(c.title)}</h1><p class="subheading">${esc(c.subtitle || 'A comfortable home. A clearer picture.')}</p></div><div class="clock">${esc(this.time(now))}<small>${esc(date)}</small></div></section>
       ${this._notice?`<div class="notice" role="status">${esc(this._notice)}<button data-action="dismiss" aria-label="Dismiss notification">×</button></div>`:''}
       <main class="grid">
-        <section class="card energy"><div class="card-head"><span class="card-title">${icon('bolt')} Today's electricity</span><span class="pill ${band==='high'?'high':band==='neutral'?'neutral':''}"><i class="dot"></i>${band==='low'?'Lower price':band==='high'?'Higher price':band==='neutral'?'Price overview':'Typical price'}</span></div>
+        <section class="card energy ${band==='high'?'price-high':''}"><div class="card-head"><span class="card-title">${icon('bolt')} Today's electricity</span><span class="pill ${band==='high'?'high':band==='neutral'?'neutral':''}"><i class="dot"></i>${band==='low'?'Lower price':band==='high'?'Higher price':band==='neutral'?'Price overview':'Typical price'}</span></div>
           <div class="energy-values"><div><div class="energy-label">Price now</div><div class="price-value">${this.fmt(current,3)}<span class="unit">${esc(c.price_unit)}</span></div></div><div class="power-now"><div class="energy-label">${icon('power',12)} Power right now</div><div class="power-value">${this.fmt(showKW?powerValue/1000:powerValue,showKW?2:powerUnit==='W'?0:2)}<span class="unit">${esc(showKW?'kW':powerUnit)}</span></div><div class="power-note">${powerValue===null?'Choose a power sensor':'Live consumption'}</div></div></div><div class="energy-description">${rows.length?`Today's time-weighted average ${this.fmt(summary.average,3)} ${esc(c.price_unit)} · ${rows.length} intervals`:'No interval data · configure the price source in the card editor'}</div>
           <div class="chart">${this.renderChart(rows,summary)}</div><div class="legend"><span><i></i>Lower quarter</span><span><i class="expensive"></i>Upper quarter</span><span><i class="now"></i>Now</span></div><div class="periods">${period(summary.low)}${period(summary.high,true)}</div>
         </section>
@@ -459,7 +459,7 @@ class HomeboardTVEditor extends HTMLElement {
     form.hass=this._hass; form.data=this._config;
     form.schema=[
       {name:'tv_mode',selector:{boolean:{}}},
-      {name:'theme',selector:{select:{options:[{value:'aurora',label:'Aurora · brighter blues & mint'},{value:'forest',label:'Forest · warm greens'}]}}},
+      {name:'theme',selector:{select:{options:[{value:'aurora',label:'Aurora · brighter blues & mint'},{value:'aurora-green',label:'Aurora green · deep sea greens & mint'},{value:'aurora-teak',label:'Aurora teak · sea green with teak & tulip'},{value:'nordic-green',label:'Nordic green · sea green, cream & ochre'},{value:'forest',label:'Forest · warm greens'},{value:'nordic',label:'Nordic · muted vintage blues'},{value:'linen',label:'Linen · light day theme'},{value:'teak',label:'Teak · warm evening theme'}]}}},
       {name:'edge_to_edge',selector:{boolean:{}}},
       {name:'keyboard_navigation',selector:{boolean:{}}},
       {name:'home_name',selector:{text:{}}},{name:'title',selector:{text:{}}},{name:'time_zone',selector:{text:{}}},{name:'locale',selector:{text:{}}},
