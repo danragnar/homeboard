@@ -396,4 +396,80 @@ class BrowserControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.controller.awaiting_dashboard)
         self.assertGreater(self.hass.timers[-1].delay,298)
 
+class WebOSControllerTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        ControllerTests.setUp(self)
+        self.controller.config.update(mode='browser',browser_launch_method='webostv',
+            webos_entity='media_player.lg',playback_entity='media_player.lg',
+            power_entity='media_player.lg',activity_entity='media_player.lg',
+            activity_attribute='source',idle_apps='My launcher',browser_app='Web Browser',
+            browser_url='https://ha.example/homeboard-home/overview')
+        self.controller.config.pop('remote_entity')
+        self.states['media_player.lg']=SimpleNamespace(state='on',attributes={'source':'My launcher'})
+
+    async def asyncTearDown(self):
+        await self.controller.stop()
+
+    async def test_launch_uses_webos_url_and_preserves_context(self):
+        context=object()
+        await self.controller.cast(context)
+        self.assertEqual(self.hass.services.calls[0][0],('webostv','command',{
+            'entity_id':'media_player.lg','command':'system.launcher/open',
+            'payload':{'target':'https://ha.example/homeboard-home/overview'}}))
+        self.assertTrue(self.hass.services.calls[0][1]['blocking'])
+        self.assertIs(self.hass.services.calls[0][1]['context'],context)
+        self.assertFalse(self.controller.awaiting_dashboard)
+        self.assertEqual(self.controller.suspended_until,0)
+        self.assertGreater(self.hass.timers[-1].delay,298)
+        self.states['media_player.lg'].attributes['source']='Web Browser'
+        self.controller.evaluate()
+        self.assertIsNone(self.controller.pending)
+        await self.controller.cast()
+        self.assertEqual(len(self.hass.services.calls),1)
+
+    async def test_webos_failure_records_error_and_cooldown(self):
+        self.hass.services.fail=True
+        await self.controller.cast()
+        self.assertEqual(self.controller.last_error,'Receiver unavailable')
+        self.assertGreater(self.hass.timers[-1].delay,298)
+        self.assertFalse(self.controller.awaiting_dashboard)
+
+    async def test_verified_source_return_starts_fresh_idle_delay(self):
+        self.controller.last_attempt=controller_module.monotonic()
+        self.states['media_player.lg'].attributes['source']='Web Browser'
+        self.controller.evaluate()
+        self.states['media_player.lg'].attributes['source']='My launcher'
+        self.controller.evaluate()
+        self.assertEqual(self.hass.timers[-1].delay,45)
+
+    async def test_turning_tv_off_cancels_pending_launch(self):
+        self.controller.evaluate()
+        timer=self.hass.timers[-1]
+        self.states['media_player.lg'].state='off'
+        self.controller.evaluate()
+        self.assertTrue(timer.cancelled)
+        await self.controller.cast()
+        self.assertEqual(self.hass.services.calls,[])
+
+    async def test_foreground_change_while_waiting_for_lock_blocks_launch(self):
+        await self.controller.dispatch_lock.acquire()
+        task=asyncio.create_task(self.controller.cast())
+        await asyncio.sleep(0)
+        self.states['media_player.lg'].attributes['source']='Netflix'
+        self.controller.dispatch_lock.release()
+        await task
+        self.assertEqual(self.hass.services.calls,[])
+
+    async def test_guard_only_launch_stops_when_guard_closes(self):
+        self.controller.config.pop('activity_entity')
+        self.controller.config['idle_guard']='binary_sensor.lg_launcher'
+        self.states['binary_sensor.lg_launcher']=SimpleNamespace(state='on',attributes={})
+        await self.controller.cast()
+        self.assertEqual(len(self.hass.services.calls),1)
+        self.states['binary_sensor.lg_launcher'].state='off'
+        self.controller.evaluate()
+        self.assertIsNone(self.controller.pending)
+        await self.controller.cast()
+        self.assertEqual(len(self.hass.services.calls),1)
+
 if __name__=='__main__': unittest.main()

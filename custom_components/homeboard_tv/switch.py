@@ -33,7 +33,8 @@ class AutoCastSwitch(SwitchEntity, RestoreEntity):
                 "exit_remaining_seconds": max(0, ceil(self.controller.home_until - now)),
                 "grace_remaining_seconds": max(0, ceil(self.controller.suspended_until - now)),
                 "cooldown_remaining_seconds": max(0, ceil(self.controller.last_attempt + self.controller.config.get("cooldown_seconds", 300) - now)) if self.controller.last_attempt != float("-inf") else 0,
-                **{key: self.controller.config.get(key) for key in ("mode", "playback_entity", "power_entity", "activity_entity", "browser_app")}}
+                "browser_launch_method": self.controller.config.get("browser_launch_method", "androidtv_remote"),
+                **{key: self.controller.config.get(key) for key in ("mode", "playback_entity", "power_entity", "activity_entity", "browser_app", "webos_entity")}}
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
         if last := await self.async_get_last_state():

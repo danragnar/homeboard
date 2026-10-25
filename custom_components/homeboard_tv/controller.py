@@ -229,12 +229,18 @@ class Controller:
                     self.connection_retries = 0
                     await self.show_view(context)
                 elif self.config["mode"] == "browser":
-                    # Same deep-link route validated by the manual TV Bro trial.
                     # Do not call launch(): its app grace is for leaving Homeboard.
-                    await self.hass.services.async_call("remote", "turn_on", {
-                        "entity_id": self.config["remote_entity"],
-                        "activity": self.config["browser_url"],
-                    }, blocking=True, context=context)
+                    if self.config.get("browser_launch_method", "androidtv_remote") == "webostv":
+                        await self.hass.services.async_call("webostv", "command", {
+                            "entity_id": self.config["webos_entity"],
+                            "command": "system.launcher/open",
+                            "payload": {"target": self.config["browser_url"]},
+                        }, blocking=True, context=context)
+                    else:
+                        await self.hass.services.async_call("remote", "turn_on", {
+                            "entity_id": self.config["remote_entity"],
+                            "activity": self.config["browser_url"],
+                        }, blocking=True, context=context)
                 else:
                     await self.hass.services.async_call("script", "turn_on", {
                         "entity_id": self.config["dashboard_script"],

@@ -157,4 +157,46 @@ class BrowserPolicyTests(unittest.TestCase):
     def test_browser_has_no_cast_connection_retries(self):
         self.assertEqual(policy.connection_retry_reason(self.config,self.states),'not Cast transport')
 
+class WebOSPolicyTests(unittest.TestCase):
+    def setUp(self):
+        self.config={'mode':'browser','browser_launch_method':'webostv',
+                     'playback_entity':'media_player.lg','power_entity':'media_player.lg',
+                     'activity_entity':'media_player.lg','activity_attribute':'source',
+                     'idle_apps':'My launcher','browser_app':'Web Browser'}
+        self.states={'media_player.lg':Snapshot('on',{'source':'My launcher'})}
+
+    def test_verified_lg_launcher_with_on_state_is_ready(self):
+        self.assertEqual(reason(self.config,self.states),'ready')
+        self.assertNotEqual(reason(self.config,self.states,enabled=False),'ready')
+        self.assertNotEqual(reason(self.config,self.states,suspended=True),'ready')
+
+    def test_streaming_unknown_and_browser_sources_do_not_launch(self):
+        for source in ['Netflix','HDMI 1',None,'Web Browser']:
+            self.states['media_player.lg']=Snapshot('on',{'source':source})
+            self.assertNotEqual(reason(self.config,self.states),'ready',source)
+        self.config['idle_apps']+=',Web Browser'
+        self.assertEqual(reason(self.config,self.states),'browser active; page unconfirmed')
+
+    def test_offline_and_active_playback_block_even_on_launcher(self):
+        for state in ['off','standby','unknown','unavailable','playing','paused','buffering']:
+            self.states['media_player.lg']=Snapshot(state,{'source':'My launcher'})
+            self.assertNotEqual(reason(self.config,self.states),'ready',state)
+
+    def test_guard_only_configuration_requires_open_guard(self):
+        self.config.pop('activity_entity')
+        self.config['idle_guard']='binary_sensor.lg_launcher'
+        for state in ['off','unknown','unavailable']:
+            self.states['binary_sensor.lg_launcher']=Snapshot(state)
+            self.assertNotEqual(reason(self.config,self.states),'ready')
+        self.states['binary_sensor.lg_launcher']=Snapshot('on')
+        self.assertEqual(reason(self.config,self.states),'ready')
+        self.states.pop('binary_sensor.lg_launcher')
+        self.assertNotEqual(reason(self.config,self.states),'ready')
+
+    def test_additional_guard_is_respected_with_verified_source(self):
+        self.config['idle_guard']='binary_sensor.lg_launcher'
+        self.assertNotEqual(reason(self.config,self.states),'ready')
+        self.states['binary_sensor.lg_launcher']=Snapshot('off')
+        self.assertNotEqual(reason(self.config,self.states),'ready')
+
 if __name__ == '__main__': unittest.main()

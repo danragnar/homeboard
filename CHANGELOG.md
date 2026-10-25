@@ -1,5 +1,10 @@
 # Changes
 
+## 0.10.0
+
+- Make browser dashboard launching configurable between Android TV Remote and LG webOS command. Existing entries keep Android TV Remote behavior.
+- Support native LG playback/source signals or an explicit idle guard, with no Android remote required for dashboard opening; retain power, playback, idle-delay and cooldown checks.
+
 ## 0.9.0
 
 - Keep electricity chart axis labels in proportion across dashboard sizes and use theme-aware chart colours.

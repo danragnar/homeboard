@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.9.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.10.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.9.0.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.10.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -139,6 +139,7 @@ Install Homeboard **0.3.0 or newer** and restart Home Assistant. Open **Settings
 | Option | Value |
 | --- | --- |
 | Dashboard transport | **TV browser** |
+| Browser launch method | **Android TV Remote** (default, including existing entries) |
 | Full dashboard URL | Your complete URL, e.g. `https://ha.example/homeboard-home/overview` |
 | Browser foreground app ID | `com.phlox.tvwebbrowser` for TV Bro |
 | Android TV remote | The remote paired to Google TV |
@@ -161,7 +162,29 @@ Choose the appropriate transport per screen:
 | Setup | Configuration |
 | --- | --- |
 | LG has an external Cast receiver or supported Google Cast | Use `cast` mode, the receiver's playback entity, LG's actual power entity, and a reliable foreground/idle guard. |
-| LG's native webOS browser can render your HA frontend | Use `script` mode and a script that opens the dashboard. `examples/lg-package.yaml` uses the native `webostv.command` action. |
+| LG's native webOS browser can render your HA frontend | Use **TV browser** transport with **LG webOS command** as the browser launch method. No Android remote or custom script is required. |
+
+For native LG browser launching, open **Settings → Devices & services → Homeboard TV → Configure** on the screen's existing entry (or add a new screen), and set:
+
+| Setting | Value |
+| --- | --- |
+| Dashboard transport | **TV browser** |
+| Browser launch method | **LG webOS command** |
+| LG webOS TV to open the browser on | Your paired LG `media_player` entity |
+| Playback entity / Screen power entity | That same LG `media_player` entity |
+| Full dashboard URL | The complete URL you successfully opened on the TV |
+| Foreground app entity | The LG `media_player` entity |
+| Foreground app attribute | `source` |
+| Allowed idle app IDs or source names | Only the exact source name observed while your custom launcher is foreground |
+| Browser foreground ID or source name | The exact `source` value observed while LG's browser is foreground |
+
+Inspect these source values in **Developer Tools → States**. Do not assume the custom launcher reports `Home`, or use its app ID if the selected attribute reports a display name. LG's `on` playback state permits launching only with a verified allowed foreground source or an open idle guard. Playing, paused, buffering, screen-off and unknown foreground states still block launching. The browser foreground value prevents relaunching even if it was accidentally included in the idle list.
+
+If the LG entity does not reliably report your launcher, leave **Foreground app entity** empty and provide an **idle guard** whose `on` state proves that the launcher is visible and the TV is safe to take over. The guard must close when the browser or any other app opens; otherwise another launch can occur after the cooldown. Without either reliable signal, leave automatic dashboard opening disabled.
+
+Homeboard sends `webostv.command` with `command: system.launcher/open` and the dashboard URL as `payload.target`, using the existing stable-idle delay and cooldown. Returning from a verified foreground app to the allowed launcher starts a fresh idle delay. Browser launches do not use Cast connection retries. Existing Android TV browser entries retain their previous behavior when no launch method has been saved.
+
+This selector controls dashboard browser launching. Streaming-app shortcuts, **Open on TV** for Music Assistant, and **Google TV Home** still use the separately configured Android TV remote. Disable the card's app controls with `launch_apps: false` for a native LG-only screen. The older custom-script route in `examples/lg-package.yaml` remains available.
 
 For script transport, configure `dashboard_script` and an `idle_guard` binary sensor. **`on` alone is not proof that LG is idle.** The example allows only source names you have verified to mean the home screen; replace the example `Home` source with values observed in your LG entity. If your model does not expose a trustworthy idle signal, automatic takeover cannot be determined safely; use an external receiver or keep the auto-dashboard switch off and invoke your opening script manually.
 
@@ -283,7 +306,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.9.0.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.10.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

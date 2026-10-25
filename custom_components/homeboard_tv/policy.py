@@ -47,9 +47,11 @@ def idle_reason(config: dict, states: Mapping[str, Snapshot], enabled=True, susp
         return "dashboard reported" if playback.attributes.get("media_title") else "receiver active; dashboard unconfirmed"
     if playback.state in {"playing", "paused", "buffering"} and not stale_dashboard:
         return "media in use"
-    # 'on' is allowed only with an explicit independent idle guard (LG reports 'on').
+    # LG reports 'on' even on its launcher; require a verified foreground source
+    # or an explicit idle guard before treating that state as idle.
     guard = config.get("idle_guard")
-    if playback.state != "idle" and not receiver_idle and not stale_dashboard and not (playback.state == "on" and guard):
+    webos_idle = mode == "browser" and config.get("browser_launch_method") == "webostv" and known_idle_activity
+    if playback.state != "idle" and not receiver_idle and not stale_dashboard and not (playback.state == "on" and (guard or webos_idle)):
         return "playback not idle"
     if guard and (guard not in states or states[guard].state != "on"):
         return "idle guard closed"

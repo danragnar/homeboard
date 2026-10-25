@@ -4,15 +4,15 @@
     "step": {
       "user": {
         "title": "Add a screen",
-        "description": "Google TV: keep its Cast entity for playback detection and select the Android TV Remote for foreground activity. Browser mode opens the full dashboard URL through the remote; power and activity signals are required. Unknown or unavailable idle signals block automatic launches.",
+        "description": "Choose TV browser and a browser launch method: Android TV Remote or LG webOS command. Google TV: use the Cast playback entity and Remote foreground entity. LG: use its media player for playback and power; select it for foreground with attribute source and enter verified launcher/browser source names, or leave foreground empty and supply an idle guard. Unknown idle signals block automatic launches. App shortcuts and Google TV Home still require an Android remote.",
         "data": {
           "name": "Screen name",
           "mode": "Dashboard transport",
           "playback_entity": "Playback entity (use Google Cast for Google TV)",
           "power_entity": "Screen power entity (required for browser transport)",
-          "activity_entity": "Foreground app entity (Google TV: select the Remote, not Media player)",
-          "activity_attribute": "Foreground app attribute",
-          "idle_apps": "Allowed idle app IDs (comma separated)",
+          "activity_entity": "Foreground app entity (Google TV: Remote; LG: media player)",
+          "activity_attribute": "Foreground attribute (Android: current_activity; LG: source)",
+          "idle_apps": "Allowed idle app IDs or source names (comma separated)",
           "idle_guard": "Additional idle guard (on = safe to show dashboard)",
           "remote_entity": "Android TV remote for browser and app launching",
           "dashboard_path": "Dashboard URL path",
@@ -26,7 +26,9 @@
           "cast_retry_limit": "Cast connection retries (0 disables)",
           "cast_receiver_apps": "Cast receiver foreground app IDs (comma separated)",
           "browser_url": "Full dashboard URL (browser transport)",
-          "browser_app": "Browser foreground app ID (TV Bro: com.phlox.tvwebbrowser)"
+          "browser_app": "Browser foreground ID or source name (TV Bro: com.phlox.tvwebbrowser)",
+          "browser_launch_method": "Browser launch method",
+          "webos_entity": "LG webOS TV to open the browser on"
         }
       }
     },
@@ -38,7 +40,9 @@
       "missing_activity": "Select a foreground app entity so Homeboard can avoid reopening the browser or interrupting other apps.",
       "missing_power": "Select the actual TV screen power entity. A Cast receiver can stay online with the screen off.",
       "invalid_browser_url": "Enter the full HTTP or HTTPS dashboard URL without embedded username/password credentials.",
-      "missing_browser_app": "Enter the browser foreground app ID."
+      "missing_browser_app": "Enter the browser foreground app ID or source name.",
+      "missing_webos_entity": "Select the LG webOS media player used to open the browser.",
+      "invalid_browser_launch_method": "Choose Android TV Remote or LG webOS command."
     }
   },
   "options": {
@@ -50,9 +54,9 @@
           "mode": "Dashboard transport",
           "playback_entity": "Playback entity (use Google Cast for Google TV)",
           "power_entity": "Screen power entity (required for browser transport)",
-          "activity_entity": "Foreground app entity (Google TV: select the Remote, not Media player)",
-          "activity_attribute": "Foreground app attribute",
-          "idle_apps": "Allowed idle app IDs (comma separated)",
+          "activity_entity": "Foreground app entity (Google TV: Remote; LG: media player)",
+          "activity_attribute": "Foreground attribute (Android: current_activity; LG: source)",
+          "idle_apps": "Allowed idle app IDs or source names (comma separated)",
           "idle_guard": "Additional idle guard (on = safe to show dashboard)",
           "remote_entity": "Android TV remote for browser and app launching",
           "dashboard_path": "Dashboard URL path",
@@ -66,9 +70,11 @@
           "cast_retry_limit": "Cast connection retries (0 disables)",
           "cast_receiver_apps": "Cast receiver foreground app IDs (comma separated)",
           "browser_url": "Full dashboard URL (browser transport)",
-          "browser_app": "Browser foreground app ID (TV Bro: com.phlox.tvwebbrowser)"
+          "browser_app": "Browser foreground ID or source name (TV Bro: com.phlox.tvwebbrowser)",
+          "browser_launch_method": "Browser launch method",
+          "webos_entity": "LG webOS TV to open the browser on"
         },
-        "description": "Google TV: keep its Cast entity for playback detection and select the Android TV Remote for foreground activity. Browser mode opens the full dashboard URL through the remote; power and activity signals are required. Unknown or unavailable idle signals block automatic launches."
+        "description": "Choose TV browser and a browser launch method: Android TV Remote or LG webOS command. Google TV: use the Cast playback entity and Remote foreground entity. LG: use its media player for playback and power; select it for foreground with attribute source and enter verified launcher/browser source names, or leave foreground empty and supply an idle guard. Unknown idle signals block automatic launches. App shortcuts and Google TV Home still require an Android remote."
       }
     },
     "error": {
@@ -79,7 +85,9 @@
       "missing_activity": "Select a foreground app entity so Homeboard can avoid reopening the browser or interrupting other apps.",
       "missing_power": "Select the actual TV screen power entity. A Cast receiver can stay online with the screen off.",
       "invalid_browser_url": "Enter the full HTTP or HTTPS dashboard URL without embedded username/password credentials.",
-      "missing_browser_app": "Enter the browser foreground app ID."
+      "missing_browser_app": "Enter the browser foreground app ID or source name.",
+      "missing_webos_entity": "Select the LG webOS media player used to open the browser.",
+      "invalid_browser_launch_method": "Choose Android TV Remote or LG webOS command."
     }
   }
 }

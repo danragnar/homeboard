@@ -27,6 +27,8 @@ def schema(values):
         field("dashboard_app"): str,
         field("dashboard_script"): entity("script"),
         field("browser_url"): str,
+        field("browser_launch_method"): selector.SelectSelector(selector.SelectSelectorConfig(options=[{"value":"androidtv_remote","label":"Android TV Remote"},{"value":"webostv","label":"LG webOS command"}])),
+        field("webos_entity"): entity("media_player"),
         field("browser_app"): str,
         field("idle_seconds"): vol.All(vol.Coerce(int), vol.Range(min=5, max=3600)),
         field("cooldown_seconds"): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
