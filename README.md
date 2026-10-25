@@ -184,7 +184,7 @@ An LG opening script is dispatched through `script.turn_on`; the integration rep
 
 ## Dashboard configuration
 
-The visual card editor provides entity selectors for price, power, temperature sensors, weather, and locks. Advanced JSON in that editor (or normal Lovelace YAML) configures scenes, TV entries, app activities, and all remaining fields. All configuration belongs to the HA card, not browser-local storage. Only the standalone **demo** stores its preview configuration locally.
+The visual card editor provides entity selectors for price, power, weather, and Home sensors (sensor, binary sensor, and lock entities). Advanced JSON in that editor (or normal Lovelace YAML) configures scenes, TV entries, app activities, and all remaining fields. All configuration belongs to the HA card, not browser-local storage. Only the standalone **demo** stores its preview configuration locally.
 
 | Option | Meaning |
 | --- | --- |
@@ -199,9 +199,10 @@ The visual card editor provides entity selectors for price, power, temperature s
 | `power_entity` | Instantaneous consumption sensor; W becomes kW above 1,000 W. Other units are preserved. Use power, not accumulated kWh. |
 | `calendar_entity` | Home Assistant `calendar.*` entity to show, including remote calendars already synced to HA. Empty by default; choose in the visual editor. |
 | `calendar_days`, `calendar_max_events` | Look ahead 1–31 days (default 7); show 1–10 events (default 3). |
-| `temperature_entities`, `temperature_unit` | Mean of valid Celsius/Fahrenheit readings, converted to `°C` or `°F`. Missing/incompatible values are excluded and the reporting count is shown. |
+| `home_sensor_entities` | Entity IDs in the unified Home sensors box. Types are detected from the entity domain and device class: temperature, humidity, locks, door/window contacts, motion, battery, and other sensor values. Values retain their units; binary sensors use meaningful status labels. Unknown/missing entities show Unavailable. All sensors are view only. |
+| `temperature_unit` | Convert temperature readings and the indoor average to `°C` (default) or `°F`. Invalid/incompatible readings are excluded from the average and reporting count. |
+| `temperature_entities`, `lock_entities` | Legacy selections are merged into Home sensors without duplicates. Saving the visual editor migrates them to `home_sensor_entities`. |
 | `weather_entity`, `forecast_type` | Forecast subscription; choose `daily`, `hourly`, or `twice_daily` supported by your provider. |
-| `lock_entities` | Read-only lock states. Unknown locks never count as secured. |
 | `scenes` | Objects with `entity`, optional `name`, `icon`, `active_entity`. |
 | `theme` | `aurora` (default): brighter blue panels with mint, lilac and warm accents. `forest`: green palette. |
 | `edge_to_edge` | `true` fills the viewport above HA navigation using the browser top layer and removes the outer card border in TV mode. Older browsers without top-layer support use fixed positioning, which may still be constrained by the host layout. Default `false`. Escape or **Exit full screen** returns to HA navigation; **Expand dashboard** re-enters. Disabled inside the HA card editor. |

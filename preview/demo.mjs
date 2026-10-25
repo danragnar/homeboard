@@ -10,11 +10,13 @@ const raw=prices.flatMap((value,hour)=>Array.from({length:4},(_,q)=>({start:new 
 const states={
  'sensor.electricity_price':state(1.36,{raw_today:raw,unit_of_measurement:'SEK/kWh'}),
  'sensor.home_power':state(1840,{unit_of_measurement:'W'}),
- 'sensor.living_temperature':state(21.6,{unit_of_measurement:'°C'}),
- 'sensor.kitchen_temperature':state(21.3,{unit_of_measurement:'°C'}),
- 'sensor.bedroom_temperature':state(20.8,{unit_of_measurement:'°C'}),
- 'sensor.office_temperature':state(21.5,{unit_of_measurement:'°C'}),
+ 'sensor.living_temperature':state(21.6,{unit_of_measurement:'°C',friendly_name:'Living room'}),
+ 'sensor.kitchen_temperature':state(21.3,{unit_of_measurement:'°C',friendly_name:'Kitchen'}),
+ 'sensor.bedroom_temperature':state(20.8,{unit_of_measurement:'°C',friendly_name:'Bedroom'}),
+ 'sensor.office_temperature':state(21.5,{unit_of_measurement:'°C',friendly_name:'Office'}),
  'media_player.demo_music':state('playing',{friendly_name:'Living room speakers · demo',media_title:'Evening light',media_artist:'Homeboard Sessions',media_album_name:'At home · sample music',entity_picture:'/preview/sample-album.svg',supported_features:17469,volume_level:.35,is_volume_muted:false}),
+ 'sensor.indoor_humidity':state(46,{device_class:'humidity',unit_of_measurement:'%',friendly_name:'Indoor humidity'}),
+ 'binary_sensor.kitchen_window':state('off',{device_class:'window',friendly_name:'Kitchen window'}),
  'calendar.family':state('off',{friendly_name:'Family calendar'}),
  'weather.home':state('partlycloudy',{temperature:9,temperature_unit:'°C'}),
  'lock.front_door':state('locked',{friendly_name:'Front door'}),
@@ -27,7 +29,7 @@ const states={
 };
 const config={...DEFAULT_CONFIG,music_assistant:{player_entity:'media_player.demo_music',playlists:[{name:'Evening favourites',media_id:'library://playlist/demo-evening'},{name:'Weekend mornings',media_id:'library://playlist/demo-weekend'},{name:'Dinner together',media_id:'library://playlist/demo-dinner'}]},edge_to_edge:true,home_name:'Our home',weather_location:'Stockholm',
  price_entity:'sensor.electricity_price',power_entity:'sensor.home_power',calendar_entity:'calendar.family',
- temperature_entities:['sensor.living_temperature','sensor.kitchen_temperature','sensor.bedroom_temperature','sensor.office_temperature'],weather_entity:'weather.home',lock_entities:['lock.front_door','lock.back_door'],
+ home_sensor_entities:['sensor.indoor_humidity','binary_sensor.kitchen_window'],temperature_entities:['sensor.living_temperature','sensor.kitchen_temperature','sensor.bedroom_temperature','sensor.office_temperature'],weather_entity:'weather.home',lock_entities:['lock.front_door','lock.back_door'],
  scenes:[{entity:'scene.evening',name:'Evening',icon:'sun',active_entity:'binary_sensor.evening_active'},{entity:'scene.movie',name:'Movie night',icon:'tv'},{entity:'scene.bright',name:'Bright & focused',icon:'bolt'},{entity:'scene.goodnight',name:'Good night',icon:'moon'}],
  tvs:[{name:'Living room · Google TV',entry_id:'demo-google',auto_entity:'switch.living_room_auto_dashboard'},{name:'Bedroom · LG TV',entry_id:'demo-lg',auto_entity:'switch.lg_auto_dashboard',launch_apps:false}]
 };

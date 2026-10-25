@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- Combine indoor temperatures and locks into Home sensors, with automatic type detection, unit-aware readings, binary sensor statuses, and a unified entity picker. Existing selections carry over.
+
 ## 0.6.0
 
 - Add a Google TV Home button and `homeboard_tv.return_home` action, with a temporary exit pause that survives browser-to-launcher detection.

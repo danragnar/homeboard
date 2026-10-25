@@ -14,6 +14,39 @@ export function temperatureMean(states, ids = [], unit = "°C") {
   }).filter(n => n !== null);
   return {value: values.length ? values.reduce((a,b) => a+b, 0)/values.length : null, count: values.length, total: ids.length};
 }
+// Legacy selections stay visible alongside the unified entity list, without duplicates.
+export function homeSensorIds(config = {}) {
+  return [...new Set([...(config.home_sensor_entities || []), ...(config.temperature_entities || []), ...(config.lock_entities || [])])];
+}
+export function homeSensors(states, config = {}) {
+  return homeSensorIds(config).map(id => {
+    const entity = states[id], a = entity?.attributes || {}, state = entity?.state;
+    const domain = id.split('.')[0], kind = a.device_class || '';
+    const unavailable = !state || ['unknown','unavailable'].includes(state);
+    const label = value => String(value).replaceAll('_',' ').replace(/^./, c => c.toUpperCase());
+    let type = domain === 'lock' ? 'lock' : kind === 'temperature' || ['°C','°F'].includes(a.unit_of_measurement) ? 'temperature' : kind || domain;
+    let icon = ({temperature:'temp',humidity:'humidity',moisture:'humidity',door:'door',window:'door',opening:'door',motion:'motion',occupancy:'motion',presence:'motion',battery:'battery',power:'bolt',energy:'bolt',lock:'lock'})[type] || 'sensor';
+    let value = unavailable ? 'Unavailable' : label(state), unit = '', tone = unavailable ? 'muted' : 'normal';
+    if (!unavailable && domain === 'lock') tone = state === 'locked' ? 'good' : 'warn';
+    else if (!unavailable && domain === 'binary_sensor') {
+      const labels = ({door:['Closed','Open'],window:['Closed','Open'],opening:['Closed','Open'],motion:['Clear','Motion'],occupancy:['Clear','Occupied'],presence:['Away','Home'],moisture:['Dry','Wet'],smoke:['Clear','Smoke detected'],gas:['Clear','Gas detected'],safety:['Safe','Unsafe'],battery:['Normal','Low'],connectivity:['Disconnected','Connected'],problem:['Clear','Problem'],lock:['Locked','Unlocked']})[kind] || ['Off','On'];
+      value = ['on','off'].includes(state) ? labels[state === 'on' ? 1 : 0] : label(state);
+      if (['on','off'].includes(state)) tone = ['connectivity','presence','occupancy'].includes(kind) ? (state === 'on' ? 'good' : 'normal') : state === 'on' ? 'warn' : 'good';
+    } else if (!unavailable && domain === 'sensor') {
+      const numeric = finite(state);
+      if (numeric !== null) {
+        unit = a.unit_of_measurement || '';
+        let reading = numeric;
+        if (type === 'temperature' && ['°C','°F'].includes(unit)) {
+          const converted = temperatureMean(states,[id],config.temperature_unit || '°C');
+          reading = converted.value; unit = config.temperature_unit || '°C';
+        }
+        value = number(reading, type === 'temperature' ? 1 : Number.isInteger(reading) ? 0 : 1, config.locale || 'en-GB');
+      }
+    }
+    return {id, name:a.friendly_name || id, type, icon, value, unit, tone};
+  });
+}
 export function zonedDate(date, timeZone) {
   return new Intl.DateTimeFormat("en-CA", {timeZone, year:"numeric", month:"2-digit", day:"2-digit"}).format(date);
 }
@@ -145,7 +178,7 @@ export const DEFAULT_CONFIG = {
   type:"custom:homeboard-tv-card", title:"A little more at home.", home_name:"Our home",
   tv_mode:true, theme:"aurora", edge_to_edge:false, keyboard_navigation:true, time_zone:"Europe/Stockholm", locale:"en-GB", temperature_unit:"°C", price_unit:"SEK/kWh",
   price_entity:"", price_attribute:"raw_today", price_value_key:"value", price_start_key:"start", price_end_key:"end",
-  price_factor:1, price_offset:0, power_entity:"", temperature_entities:[], weather_entity:"", forecast_type:"daily",
+  price_factor:1, price_offset:0, power_entity:"", home_sensor_entities:[], temperature_entities:[], weather_entity:"", forecast_type:"daily",
   music_assistant:null, calendar_entity:"", calendar_days:7, calendar_max_events:3, lock_entities:[], scenes:[], tvs:[], apps:[
     {name:"Netflix", activity:"netflix://", color:"#e50914"},
     {name:"SVT Play", activity:"https://www.svtplay.se", color:"#54cf87"},

@@ -1,4 +1,4 @@
-import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, lockSummary, sceneStatus, zonedDate, calendarEvents, validateMusic, musicNowPlaying, musicCommand} from './model.mjs';
+import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, homeSensorIds, homeSensors, sceneStatus, zonedDate, calendarEvents, validateMusic, musicNowPlaying, musicCommand} from './model.mjs';
 import {navigationKey, directionalTarget} from './navigation.mjs';
 import {patchHTML} from './dom.mjs';
 import {styles} from './styles.mjs';
@@ -12,6 +12,11 @@ const paths = {
  bolt:'m13 2-9 12h7l-1 8 10-12h-7l1-8',
  calendar:'M3 5h18v16H3ZM7 3v4m10-4v4M3 10h18M7 14h2m4 0h4m-10 3h2',
  power:'M12 2v10M6 5a9 9 0 1 0 12 0',
+ humidity:'M12 3C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-12ZM9 16a3 3 0 0 0 3 3',
+ door:'M4 21h16M6 21V3h12v18M14 12h1',
+ motion:'M13 3h1M9 21l3-7 4 3v4M6 12l3-5 5 1 3 4h4M9 7l3 7',
+ battery:'M3 7h17v10H3ZM20 10h2v4M7 10v4m4-4v4m4-4v4',
+ sensor:'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M6 6a8 8 0 0 0 0 12M18 6a8 8 0 0 1 0 12M3 3a13 13 0 0 0 0 18M21 3a13 13 0 0 1 0 18',
  temp:'M9 14.5V5a3 3 0 0 1 6 0v9.5a5 5 0 1 1-6 0ZM12 8v9',
  sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5',
  cloud:'M6 18a4 4 0 1 1 1-7.9A6 6 0 0 1 19 12a3 3 0 1 1 0 6Z',
@@ -64,7 +69,7 @@ export class HomeboardTVCard extends HTMLElement {
   static getConfigElement() { return document.createElement('homeboard-tv-editor'); }
   static getStubConfig() { return {...DEFAULT_CONFIG}; }
   setConfig(config) {
-    for (const key of ['temperature_entities','lock_entities','scenes','tvs','apps']) {
+    for (const key of ['home_sensor_entities','temperature_entities','lock_entities','scenes','tvs','apps']) {
       if (config[key] !== undefined && !Array.isArray(config[key])) throw new Error(`${key} must be a list`);
     }
     const next = {...DEFAULT_CONFIG, ...config};
@@ -78,6 +83,7 @@ export class HomeboardTVCard extends HTMLElement {
     for (const [key,max] of [['calendar_days',31],['calendar_max_events',10]]) {
       if (!Number.isInteger(next[key]) || next[key] < 1 || next[key] > max) throw new Error(`${key} must be an integer from 1 to ${max}`);
     }
+    if (homeSensorIds(next).some(id => typeof id !== 'string' || !/^(sensor|binary_sensor|lock)\.[a-z0-9_]+$/.test(id))) throw new Error('Home sensors must be sensor, binary_sensor or lock entity IDs');
     validateMusic(next);
     this._config = next;
     this.setAttribute('theme', next.theme);
@@ -91,7 +97,7 @@ export class HomeboardTVCard extends HTMLElement {
     if (this.isConnected && (!previous || previous.connection !== hass.connection || previous.connected !== hass.connected || previous.states?.[this._config.calendar_entity] !== hass.states?.[this._config.calendar_entity])) this.refreshCalendar(true);
     const ids = new Set([this._config.price_entity,this._config.power_entity,this._config.weather_entity,this._config.calendar_entity,
       this._config.music_assistant?.player_entity,
-      ...this._config.temperature_entities,...this._config.lock_entities,
+      ...homeSensorIds(this._config),
       ...this._config.scenes.flatMap(scene => [scene.entity,scene.active_entity]),
       ...this._config.tvs.map(tv => tv.auto_entity)].filter(Boolean));
     if (!this._drawer && (!previous || previous.connected !== hass.connected || [...ids].some(id => previous.states?.[id] !== hass.states?.[id]))) this.render();
@@ -369,10 +375,11 @@ export class HomeboardTVCard extends HTMLElement {
     const band=priceBand(current,rows);
     const power=states[c.power_entity], powerValue=finite(power?.state), powerUnit=power?.attributes?.unit_of_measurement || 'W';
     const showKW=powerUnit==='W' && powerValue!==null && Math.abs(powerValue)>=1000;
-    const temp=temperatureMean(states,c.temperature_entities,c.temperature_unit);
+    const sensors=homeSensors(states,c);
+    const temp=temperatureMean(states,sensors.filter(item=>item.type==='temperature').map(item=>item.id),c.temperature_unit);
     const weather=states[c.weather_entity];
     const agenda=calendarEvents(this._calendarEvents,c,now), calendar=states[c.calendar_entity];
-    const locks=lockSummary(states,c.lock_entities);
+
     const tv=this.tv(), auto=tv?.auto_entity ? states[tv.auto_entity] : null;
     const period=(row,high=false)=>`<div class="period"><div><div class="period-label">${high?'↗ Highest':'↘ Lowest'}</div><div class="period-time">${row?`${esc(this.time(row.start))}–${esc(this.time(row.end))}`:'—'}</div></div><div class="period-price ${high?'high':''}">${this.fmt(row?.value,3)}<small>${esc(c.price_unit)}</small></div></div>`;
     const date=now.toLocaleDateString(c.locale,{timeZone:c.time_zone,weekday:'long',day:'numeric',month:'long'});
@@ -392,11 +399,14 @@ export class HomeboardTVCard extends HTMLElement {
         <section class="card calendar"><div class="card-head"><span class="card-title">${icon('calendar')} Coming up</span><span class="reduced">NEXT ${c.calendar_days} DAYS</span></div><div class="calendar-source">${esc(calendar?.attributes?.friendly_name || c.calendar_entity || 'Your calendar')}</div>
           <div class="agenda">${!c.calendar_entity?'<div class="empty">Choose a Home Assistant calendar in the card editor.</div>':this._calendarError || !calendar || ['unknown','unavailable'].includes(calendar.state)?`<div class="empty">${esc(this._calendarError || 'Calendar unavailable. Check the entity and its connection.')}</div>`:agenda.length?agenda.map(event=>`<div class="agenda-event"><div class="agenda-when">${esc(this.calendarWhen(event))}</div><div class="agenda-title">${esc(event.summary)}</div>${event.location?`<div class="agenda-location">${esc(event.location)}</div>`:''}</div>`).join(''):`<div class="empty">${this._calendarPending?'Loading events…':'No upcoming events.'}</div>`}</div>
         </section>
-        <section class="card metric"><div class="card-head"><span class="card-title">${icon('temp')} Inside, on average</span></div><div class="stat-line"><div class="stat-number">${this.fmt(temp.value)}<span class="unit">${esc(c.temperature_unit)}</span></div><div class="mini-icon">${icon('home',24)}</div></div><div class="metric-note">${temp.count} of ${temp.total} temperature sensors reporting</div><div class="temperature-strip">${Array.from({length:Math.max(1,temp.total)},(_,i)=>`<i class="${i<temp.count?'filled':''}"></i>`).join('')}</div></section>
+        <section class="card home-sensors"><div class="card-head"><span class="card-title">${icon('home')} Home sensors</span><span class="reduced">LIVE · VIEW ONLY</span></div>
+          ${temp.total?`<div class="sensor-average"><div><div class="energy-label">Inside, on average</div><div class="stat-number">${this.fmt(temp.value)}<span class="unit">${esc(c.temperature_unit)}</span></div></div><span class="reduced">${temp.count}/${temp.total} reporting</span></div>`:''}
+          <div class="sensor-list">${sensors.length?sensors.map(sensor=>`<div class="sensor-item ${sensor.tone}"><span class="sensor-icon">${icon(sensor.icon,19)}</span><div class="sensor-detail"><div class="sensor-name" title="${esc(sensor.name)}">${esc(sensor.name)}</div><div class="sensor-value">${esc(sensor.value)}${sensor.unit?`<span class="unit">${esc(sensor.unit)}</span>`:''}</div></div></div>`).join(''):'<div class="empty">Choose home sensors in the card editor to see temperatures, locks and more.</div>'}</div>
+        </section>
         <section class="card weather"><div class="card-head"><span class="card-title">${icon('sun')} A look outside</span><span class="reduced">${esc(c.weather_location || c.home_name)}</span></div><div class="forecast-current"><div><div class="weather-temp">${this.fmt(weather?.attributes?.temperature,0)}<span class="unit">${esc(weather?.attributes?.temperature_unit||c.temperature_unit)}</span></div><div class="condition">${esc((weather?.state === 'partlycloudy' ? 'Partly cloudy' : (weather?.state || 'Weather not configured').replaceAll('-',' ')))}</div></div><div class="weather-symbol">${icon(weatherIcon(weather?.state || ''),48)}</div></div>
           <div class="forecast">${forecast.length?forecast.map(f=>`<div class="forecast-day">${esc(c.forecast_type==='hourly'?this.time(f.datetime):new Date(f.datetime).toLocaleDateString(c.locale,{timeZone:c.time_zone,weekday:'short'}))}${icon(weatherIcon(f.condition||''),20)}<strong>${this.fmt(f.temperature,0)}°</strong>${f.templow!==undefined?`<small>${this.fmt(f.templow,0)}°</small>`:''}</div>`).join(''):`<div class="empty" style="grid-column:1/-1;padding:0">${esc(this._weatherError || 'Choose a weather entity for the forecast.')}</div>`}</div>
         </section>
-        <section class="card security"><div class="card-head"><span class="card-title">${icon('lock')} Peace of mind</span><span class="pill ${locks.secured?'':'amber'}">${locks.items.length?`${locks.items.filter(i=>i.state==='locked').length}/${locks.items.length} secured`:'Not configured'}</span></div><div class="security-title">${icon('shield',31)}<div><strong>${locks.secured?'All doors secured':!locks.items.length?'Add your doors':locks.unknown?'Check door status':'A door needs attention'}</strong><small>Live lock status · view only</small></div></div>${locks.items.length?locks.items.map(lock=>`<div class="lock-row"><span>${esc(lock.name)}</span><span class="lock-state ${lock.state==='locked'?'':'warn'}">${icon('lock',12)}${esc(lock.state.charAt(0).toUpperCase()+lock.state.slice(1))}</span></div>`).join(''):'<div class="empty">Select your lock entities in the card editor.</div>'}</section>
+
         <section class="card scenes"><div class="card-head"><span class="card-title">${icon('scene')} Set the mood</span><span class="reduced">SCENES</span></div><div class="scene-list">${c.scenes.length?c.scenes.map((scene,i)=>{const status=sceneStatus(states,scene,c);return `<button class="scene ${status==='Active'?'active':''}" data-action="scene" data-index="${i}" aria-disabled="${this._busy}"><span class="scene-top">${icon(scene.icon || 'scene',18)}${status==='Active'?'<i class="dot" style="color:var(--mint)"></i>':''}</span><span class="scene-name">${esc(scene.name || states[scene.entity]?.attributes?.friendly_name || scene.entity)}</span><span class="scene-status">${esc(status)}</span></button>`}).join(''):'<div class="empty">Add scenes and optional activity helpers.</div>'}</div></section>
       </main>
       ${this.musicPanel()}
@@ -476,7 +486,7 @@ class HomeboardTVEditor extends HTMLElement {
     if(!this._config) return;
     this.shadowRoot.innerHTML='<style>:host{display:block}p{line-height:1.6;color:var(--secondary-text-color)}textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:12px;border-radius:8px;font-family:monospace}button{padding:10px;margin-top:8px}.error{color:var(--error-color)}</style><ha-form></ha-form><p>Music Assistant: choose a player from the Home Assistant integration. Track information and controls appear on the dashboard. No URL is needed.</p><ha-form data-music-form></ha-form><p>Advanced configuration: optional Music Assistant interface links and playlists (music_assistant), scenes, TVs, apps, and custom price field mappings. Edit the JSON below, then apply.</p><textarea aria-label="Advanced card configuration"></textarea><button>Apply advanced configuration</button><p class="error" role="alert"></p>';
     const form=this.shadowRoot.querySelector('ha-form');
-    form.hass=this._hass; form.data=this._config;
+    form.hass=this._hass; form.data={...this._config,home_sensor_entities:homeSensorIds(this._config)};
     form.schema=[
       {name:'tv_mode',selector:{boolean:{}}},
       {name:'theme',selector:{select:{options:[{value:'aurora',label:'Aurora · brighter blues & mint'},{value:'forest',label:'Forest · warm greens'}]}}},
@@ -489,15 +499,15 @@ class HomeboardTVEditor extends HTMLElement {
       {name:'calendar_entity',selector:{entity:{domain:'calendar'}}},
       {name:'calendar_days',selector:{number:{min:1,max:31,mode:'box'}}},
       {name:'calendar_max_events',selector:{number:{min:1,max:10,mode:'box'}}},
-      {name:'temperature_entities',selector:{entity:{domain:'sensor',multiple:true}}},
+      {name:'home_sensor_entities',selector:{entity:{domain:['sensor','binary_sensor','lock'],multiple:true}}},
       {name:'temperature_unit',selector:{select:{options:['°C','°F']}}},
       {name:'weather_entity',selector:{entity:{domain:'weather'}}},
       {name:'forecast_type',selector:{select:{options:['daily','hourly','twice_daily']}}},
-      {name:'lock_entities',selector:{entity:{domain:'lock',multiple:true}}},
+
     ];
-    form.computeLabel=s=>s.name.replaceAll('_',' ');
+    form.computeLabel=s=>s.name==='home_sensor_entities'?'Home sensors':s.name.replaceAll('_',' ');
     form.addEventListener('value-changed',event=>{
-      this._config={...this._config,...event.detail.value};
+      this._config={...this._config,...event.detail.value,temperature_entities:[],lock_entities:[]};
       this.shadowRoot.querySelector('textarea').value=JSON.stringify(this._config,null,2);
       this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));
     });
