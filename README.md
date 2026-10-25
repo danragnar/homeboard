@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.8.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.9.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.8.0.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.9.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -215,11 +215,11 @@ The visual card editor provides entity selectors for price, power, weather, and 
 | `temperature_entities`, `lock_entities` | Legacy selections are merged into Home sensors without duplicates. Saving the visual editor migrates them to `home_sensor_entities`. |
 | `weather_entity`, `forecast_type` | Forecast subscription; choose `daily`, `hourly`, or `twice_daily` supported by your provider. |
 | `scenes` | Objects with `entity`, optional `name`, `icon`, `active_entity`. |
-| `theme` | `aurora` (default): brighter blue panels with mint, lilac and warm accents. `forest`: green palette. |
+| `theme` | `aurora` (default): blue and mint. `aurora-green`: sea green and mint. `aurora-teak`: sea green with teak and tulip accents. `nordic-green`: sea green, cream and ochre. `forest`: warm greens. `nordic`: muted vintage blues. `linen`: light day palette. `teak`: warm evening palette. |
 | `edge_to_edge` | `true` fills the viewport above HA navigation using the browser top layer and removes the outer card border in TV mode. Older browsers without top-layer support use fixed positioning, which may still be constrained by the host layout. Default `false`. Escape or **Exit full screen** returns to HA navigation; **Expand dashboard** re-enters. Disabled inside the HA card editor. |
 | `keyboard_navigation` | Arrow-key spatial navigation, default `true`; requires a browser/receiver that forwards key events. |
 | `tvs` | Objects with `name`, `entry_id`, optional `auto_entity`, `launch_apps`. Set `launch_apps: false` on an LG-only entry without an Android remote. |
-| `apps` | Objects with `name`, `activity`, optional hexadecimal `color`. Add/reorder freely. |
+| `apps` | Objects with `name`, `activity`, optional hexadecimal `color` and built-in `icon` (for example `fire`). Add/reorder freely. |
 
 Scene icons supported: `sun`, `moon`, `tv`, `bolt`, `home`, `scene`, `temp`, `lock`, `shield`, `cloud`, `rain`, `cast`, `power`.
 
@@ -283,7 +283,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.8.0.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.9.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

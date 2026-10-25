@@ -1,8 +1,15 @@
 # Changes
 
-## 0.8.0
+## 0.9.0
 
 - Replace the Set the mood panel with a child-friendly dressing guide that adapts to the current weather, temperature, rain, and snow.
+- Keep electricity chart axis labels in proportion across dashboard sizes and use theme-aware chart colours.
+- Add the Tänd brasa fireplace shortcut with a fire icon.
+- Add Aurora green, Aurora teak, Nordic green, Nordic, Linen and Teak themes alongside Aurora and Forest.
+- Allow preview themes through the URL and fall back safely when the requested theme is invalid.
+
+## 0.8.0
+
 - Load Music Assistant favorite playlists automatically with names, artwork, playback, refresh, and a configurable display limit (0 shows all).
 
 ## 0.7.0

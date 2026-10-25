@@ -17,8 +17,9 @@ export function temperatureMean(states, ids = [], unit = "°C") {
 // A small, intentionally conservative guide for getting children ready to go out.
 // It uses the current weather observation rather than a forecast, so the advice
 // changes as soon as the configured weather entity does.
-export function dressingAdvice(temperature, condition = '') {
-  const value = finite(temperature), weather = String(condition).toLowerCase();
+export function dressingAdvice(temperature, condition = '', unit = '°C') {
+  const reading = finite(temperature), weather = String(condition).toLowerCase();
+  const value = reading === null || !['°C','°F'].includes(unit) || ['unknown','unavailable'].includes(weather) ? null : unit === '°F' ? (reading - 32) * 5/9 : reading;
   if (value === null) return {headline:'Kolla vädret först', items:['Välj kläder efter hur det känns ute'], icon:'cloud'};
   const snowy = /snow|sleet|hail|freezing/.test(weather);
   const wet = snowy || /rain|pour|lightning/.test(weather);
@@ -35,7 +36,7 @@ export function dressingAdvice(temperature, condition = '') {
     headline = 'Varmt ute'; items = ['T-shirt eller tunn tröja', 'Lätta kläder', 'Keps i stark sol']; icon = 'sun';
   }
   if (wet) {
-    items = ['Regnjacka', snowy ? 'Varma vattentäta stövlar' : 'Stövlar eller vattentäta skor', ...items.slice(0,1)];
+    items = ['Regnjacka', snowy ? 'Varma vattentäta stövlar' : 'Stövlar eller vattentäta skor', ...items.filter(item => !/skor|stövlar/i.test(item))];
     headline = snowy ? 'Blött och vinterväder' : 'Regnigt ute'; icon = snowy ? 'snow' : 'rain';
   }
   return {headline, items, icon};
@@ -212,6 +213,7 @@ export const DEFAULT_CONFIG = {
   music_assistant:null, calendar_entity:"", calendar_days:7, calendar_max_events:3, lock_entities:[], scenes:[], tvs:[], apps:[
     {name:"Netflix", activity:"netflix://", color:"#e50914"},
     {name:"SVT Play", activity:"https://www.svtplay.se", color:"#54cf87"},
-    {name:"TV4 Play", activity:"https://www.tv4play.se", color:"#ed3a45"}
+    {name:"TV4 Play", activity:"https://www.tv4play.se", color:"#ed3a45"},
+    {name:"Tänd brasa", activity:"https://www.svtplay.se/video/KXvMGAZ/brasa/endast-sprakande-brasa?video=visa", color:"#e8743b", icon:"fire"}
   ]
 };

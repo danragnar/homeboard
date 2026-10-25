@@ -100,3 +100,8 @@ views:
               - name: TV4 Play
                 activity: https://www.tv4play.se
                 color: '#ed3a45'
+              - name: Tänd brasa
+                # Opens SVT Play's crackling fireplace video.
+                activity: https://www.svtplay.se/video/KXvMGAZ/brasa/endast-sprakande-brasa?video=visa
+                color: '#e8743b'
+                icon: fire

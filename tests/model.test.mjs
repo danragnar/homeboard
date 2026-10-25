@@ -49,7 +49,7 @@ test('Scenes only claim active when an explicit tracking helper is on',()=>{
 test('Entity names are escaped before rendering',()=>assert.equal(esc('<img src=x onerror="x">'), '&lt;img src=x onerror=&quot;x&quot;&gt;'));
 test('Dressing advice is child-friendly and prioritises wet weather',()=>{
  assert.deepEqual(dressingAdvice(20,'sunny').items,['T-shirt eller tunn tröja','Lätta kläder','Keps i stark sol']);
- assert.deepEqual(dressingAdvice(8,'rainy').items,['Regnjacka','Stövlar eller vattentäta skor','Jacka eller tjock tröja']);
+ assert.deepEqual(dressingAdvice(8,'rainy').items,['Regnjacka','Stövlar eller vattentäta skor','Jacka eller tjock tröja','Långbyxor']);
  assert.match(dressingAdvice(-7,'snowy').headline,/Blött/);
  assert.equal(dressingAdvice(null).headline,'Kolla vädret först');
 });
@@ -81,4 +81,20 @@ test('Timed calendar events handle DST offsets and exclusive end boundaries',asy
   {start:'2026-10-25T10:00:00Z',end:'2026-10-25T09:00:00Z'}
  ],{},new Date('2026-10-25T02:00:00+02:00'));
  assert.deepEqual(rows.map(r=>r.summary),['First','Second']);
+});
+
+test('Dressing advice converts Fahrenheit and rejects unavailable observations',()=>{
+ assert.deepEqual(dressingAdvice(32,'cloudy','°F'),dressingAdvice(0,'cloudy'));
+ assert.deepEqual(dressingAdvice(68,'sunny','°F'),dressingAdvice(20,'sunny'));
+ for(const value of [null,undefined,'','unknown','unavailable']) assert.equal(dressingAdvice(value,'rainy').headline,'Kolla vädret först');
+ for(const state of ['unavailable','unknown']) assert.equal(dressingAdvice(9,state).headline,'Kolla vädret först');
+ assert.equal(dressingAdvice(9,'cloudy','K').headline,'Kolla vädret först');
+});
+test('Wet winter advice preserves warm layers, hats and mittens',()=>{
+ for(const temperature of [-7,0]) {
+  const advice=dressingAdvice(temperature,'snowy-rainy');
+  assert.match(advice.items.join(' '),/mössa och vantar/i);
+  assert.match(advice.items.join(' '),/Vinteroverall|Varm jacka/);
+  assert.ok(advice.items.includes('Varma vattentäta stövlar'));
+ }
 });
