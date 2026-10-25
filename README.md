@@ -215,11 +215,11 @@ The visual card editor provides entity selectors for price, power, weather, and 
 | `temperature_entities`, `lock_entities` | Legacy selections are merged into Home sensors without duplicates. Saving the visual editor migrates them to `home_sensor_entities`. |
 | `weather_entity`, `forecast_type` | Forecast subscription; choose `daily`, `hourly`, or `twice_daily` supported by your provider. |
 | `scenes` | Objects with `entity`, optional `name`, `icon`, `active_entity`. |
-| `theme` | `aurora` (default): brighter blue panels with mint, lilac and warm accents. `forest`: green palette. |
+| `theme` | `aurora` (default): blue and mint. `aurora-green`: sea green and mint. `aurora-teak`: sea green with teak and tulip accents. `nordic-green`: sea green, cream and ochre. `forest`: warm greens. `nordic`: muted vintage blues. `linen`: light day palette. `teak`: warm evening palette. |
 | `edge_to_edge` | `true` fills the viewport above HA navigation using the browser top layer and removes the outer card border in TV mode. Older browsers without top-layer support use fixed positioning, which may still be constrained by the host layout. Default `false`. Escape or **Exit full screen** returns to HA navigation; **Expand dashboard** re-enters. Disabled inside the HA card editor. |
 | `keyboard_navigation` | Arrow-key spatial navigation, default `true`; requires a browser/receiver that forwards key events. |
 | `tvs` | Objects with `name`, `entry_id`, optional `auto_entity`, `launch_apps`. Set `launch_apps: false` on an LG-only entry without an Android remote. |
-| `apps` | Objects with `name`, `activity`, optional hexadecimal `color`. Add/reorder freely. |
+| `apps` | Objects with `name`, `activity`, optional hexadecimal `color` and built-in `icon` (for example `fire`). Add/reorder freely. |
 
 Scene icons supported: `sun`, `moon`, `tv`, `bolt`, `home`, `scene`, `temp`, `lock`, `shield`, `cloud`, `rain`, `cast`, `power`.
 

@@ -186,6 +186,7 @@ export const DEFAULT_CONFIG = {
   music_assistant:null, calendar_entity:"", calendar_days:7, calendar_max_events:3, lock_entities:[], scenes:[], tvs:[], apps:[
     {name:"Netflix", activity:"netflix://", color:"#e50914"},
     {name:"SVT Play", activity:"https://www.svtplay.se", color:"#54cf87"},
-    {name:"TV4 Play", activity:"https://www.tv4play.se", color:"#ed3a45"}
+    {name:"TV4 Play", activity:"https://www.tv4play.se", color:"#ed3a45"},
+    {name:"Tänd brasa", activity:"https://www.svtplay.se/video/KXvMGAZ/brasa/endast-sprakande-brasa?video=visa", color:"#e8743b", icon:"fire"}
   ]
 };

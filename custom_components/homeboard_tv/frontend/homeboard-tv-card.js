@@ -10,6 +10,7 @@ const paths = {
  next:'M19 4v16M5 4l12 8-12 8Z',
  home:'M3 10 12 3l9 7M5 9v12h14V9M9 21v-7h6v7',
  bolt:'m13 2-9 12h7l-1 8 10-12h-7l1-8',
+ fire:'M12 22c4 0 7-3 7-7 0-4-3-7-5-11-1 3-2 5-4 6 0-2-1-3-2-4-2 3-3 6-3 9 0 4 3 7 7 7Zm0 0c-2 0-3-1.5-3-3.5 0-2 1.5-3.5 3-5.5 1.5 2 3 3.5 3 5.5S14 22 12 22Z',
  calendar:'M3 5h18v16H3ZM7 3v4m10-4v4M3 10h18M7 14h2m4 0h4m-10 3h2',
  power:'M12 2v10M6 5a9 9 0 1 0 12 0',
  humidity:'M12 3C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-12ZM9 16a3 3 0 0 0 3 3',
@@ -79,7 +80,7 @@ export class HomeboardTVCard extends HTMLElement {
     for (const tv of next.tvs) if (!tv || !tv.name || !tv.entry_id) throw new Error('Each TV needs a name and entry_id');
     for (const scene of next.scenes) if (!scene || !scene.entity?.startsWith('scene.')) throw new Error('Each scene needs a scene.entity_id in entity');
     for (const app of next.apps) if (!app || !app.name || !app.activity) throw new Error('Each app needs name and activity');
-    if (!['aurora','forest'].includes(next.theme)) throw new Error('theme must be aurora or forest');
+    if (!['aurora','aurora-green','aurora-teak','nordic-green','forest','nordic','linen','teak'].includes(next.theme)) throw new Error('theme must be aurora, aurora-green, aurora-teak, nordic-green, forest, nordic, linen or teak');
     if (next.calendar_entity && (typeof next.calendar_entity !== 'string' || !/^calendar\.[a-z0-9_]+$/.test(next.calendar_entity))) throw new Error('calendar_entity must be a calendar entity ID');
     for (const [key,max] of [['calendar_days',31],['calendar_max_events',10]]) {
       if (!Number.isInteger(next[key]) || next[key] < 1 || next[key] > max) throw new Error(`${key} must be an integer from 1 to ${max}`);
@@ -320,16 +321,19 @@ export class HomeboardTVCard extends HTMLElement {
     const x = time => left + (time-start)/(end-start)*width;
     const y = value => top + height - (value-min)/range*height;
     const zero=y(0);
-    const guides=[min,(min+max)/2,max].map(n => `<line x1="${left}" x2="${left+width}" y1="${y(n)}" y2="${y(n)}" stroke="#ffffff0d"/><text x="${left-7}" y="${y(n)+3}" text-anchor="end">${this.fmt(n,1)}</text>`).join('');
+    // Axis text lives outside the stretched SVG so it keeps its proportions.
+    const guideValues=[min,(min+max)/2,max];
+    const guides=guideValues.map(n => `<line x1="${left}" x2="${left+width}" y1="${y(n)}" y2="${y(n)}" vector-effect="non-scaling-stroke" style="stroke:var(--chart-guide)"/>`).join('');
+    const yLabels=guideValues.map(n => `<span class="chart-y ${n===guideValues[1]?'mid':''}" style="top:calc((100% - var(--axis-row)) * ${y(n)/130});width:${(left-5)/710*100}%">${this.fmt(n,1)}</span>`).join('');
     const bars=rows.map(r => {
       const band=priceBand(r.value,rows), current=r===summary.current;
-      const color=current?'#f3f5e9':band==='low'?'#c7e7a5':band==='high'?'#e5b36d':'#6e8b75';
+      const color=current?'now':band==='low'?'low':band==='high'?'high':'mid';
       const w=Math.max(.5,x(+r.end)-x(+r.start)-1.5);
-      return `<rect x="${x(+r.start)}" y="${Math.min(zero,y(r.value))}" width="${w}" height="${Math.max(1,Math.abs(y(r.value)-zero))}" rx="1.5" fill="${color}"><title>${esc(this.time(r.start))}–${esc(this.time(r.end))}: ${esc(this.fmt(r.value,3))} ${esc(this._config.price_unit)}</title></rect>`;
+      return `<rect x="${x(+r.start)}" y="${Math.min(zero,y(r.value))}" width="${w}" height="${Math.max(1,Math.abs(y(r.value)-zero))}" rx="1.5" style="fill:var(--chart-${color})"><title>${esc(this.time(r.start))}–${esc(this.time(r.end))}: ${esc(this.fmt(r.value,3))} ${esc(this._config.price_unit)}</title></rect>`;
     }).join('');
     const indices=[0,Math.floor(rows.length*.25),Math.floor(rows.length*.5),Math.floor(rows.length*.75),rows.length-1];
-    const labels=indices.map((i,j)=>`<text x="${x(j===4 ? +rows[i].end : +rows[i].start)}" y="149" text-anchor="${j===0?'start':j===4?'end':'middle'}">${esc(this.time(j===4 ? rows[i].end : rows[i].start))}</text>`).join('');
-    return `<svg viewBox="0 0 710 159" preserveAspectRatio="none" role="img" aria-label="Today's electricity price. Lowest ${esc(this.fmt(summary.low.value,3))} at ${esc(this.time(summary.low.start))}; highest ${esc(this.fmt(summary.high.value,3))} at ${esc(this.time(summary.high.start))} ${esc(this._config.price_unit)}">${guides}${bars}${labels}</svg>`;
+    const labels=indices.map((i,j)=>`<span class="chart-x ${j===0?'start':j===4?'end':''}" style="left:${x(j===4 ? +rows[i].end : +rows[i].start)/710*100}%">${esc(this.time(j===4 ? rows[i].end : rows[i].start))}</span>`).join('');
+    return `<svg viewBox="0 0 710 130" preserveAspectRatio="none" role="img" aria-label="Today's electricity price. Lowest ${esc(this.fmt(summary.low.value,3))} at ${esc(this.time(summary.low.start))}; highest ${esc(this.fmt(summary.high.value,3))} at ${esc(this.time(summary.high.start))} ${esc(this._config.price_unit)}">${guides}${bars}</svg><div aria-hidden="true">${yLabels}${labels}</div>`;
   }
   async refreshMusicFavorites(force = false) {
     const music = this._config.music_assistant;
@@ -450,7 +454,7 @@ export class HomeboardTVCard extends HTMLElement {
       <section class="heading"><div><div class="eyebrow">YOUR EVERYDAY, AT A GLANCE</div><h1 class="greeting">${esc(c.title)}</h1><p class="subheading">${esc(c.subtitle || 'A comfortable home. A clearer picture.')}</p></div><div class="clock">${esc(this.time(now))}<small>${esc(date)}</small></div></section>
       ${this._notice?`<div class="notice" role="status">${esc(this._notice)}<button data-action="dismiss" aria-label="Dismiss notification">×</button></div>`:''}
       <main class="grid">
-        <section class="card energy"><div class="card-head"><span class="card-title">${icon('bolt')} Today's electricity</span><span class="pill ${band==='high'?'high':band==='neutral'?'neutral':''}"><i class="dot"></i>${band==='low'?'Lower price':band==='high'?'Higher price':band==='neutral'?'Price overview':'Typical price'}</span></div>
+        <section class="card energy ${band==='high'?'price-high':''}"><div class="card-head"><span class="card-title">${icon('bolt')} Today's electricity</span><span class="pill ${band==='high'?'high':band==='neutral'?'neutral':''}"><i class="dot"></i>${band==='low'?'Lower price':band==='high'?'Higher price':band==='neutral'?'Price overview':'Typical price'}</span></div>
           <div class="energy-values"><div><div class="energy-label">Price now</div><div class="price-value">${this.fmt(current,3)}<span class="unit">${esc(c.price_unit)}</span></div></div><div class="power-now"><div class="energy-label">${icon('power',12)} Power right now</div><div class="power-value">${this.fmt(showKW?powerValue/1000:powerValue,showKW?2:powerUnit==='W'?0:2)}<span class="unit">${esc(showKW?'kW':powerUnit)}</span></div><div class="power-note">${powerValue===null?'Choose a power sensor':'Live consumption'}</div></div></div><div class="energy-description">${rows.length?`Today's time-weighted average ${this.fmt(summary.average,3)} ${esc(c.price_unit)} · ${rows.length} intervals`:'No interval data · configure the price source in the card editor'}</div>
           <div class="chart">${this.renderChart(rows,summary)}</div><div class="legend"><span><i></i>Lower quarter</span><span><i class="expensive"></i>Upper quarter</span><span><i class="now"></i>Now</span></div><div class="periods">${period(summary.low)}${period(summary.high,true)}</div>
         </section>
@@ -468,7 +472,7 @@ export class HomeboardTVCard extends HTMLElement {
         <section class="card scenes"><div class="card-head"><span class="card-title">${icon('scene')} Set the mood</span><span class="reduced">SCENES</span></div><div class="scene-list">${c.scenes.length?c.scenes.map((scene,i)=>{const status=sceneStatus(states,scene,c);return `<button class="scene ${status==='Active'?'active':''}" data-action="scene" data-index="${i}" aria-disabled="${this._busy}"><span class="scene-top">${icon(scene.icon || 'scene',18)}${status==='Active'?'<i class="dot" style="color:var(--mint)"></i>':''}</span><span class="scene-name">${esc(scene.name || states[scene.entity]?.attributes?.friendly_name || scene.entity)}</span><span class="scene-status">${esc(status)}</span></button>`}).join(''):'<div class="empty">Add scenes and optional activity helpers.</div>'}</div></section>
       </main>
       ${this.musicPanel()}
-      <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app on your selected Google TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps"><button class="app tv-home" data-action="home" aria-label="Return ${esc(tv?.name || 'selected TV')} to Google TV Home" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}">${icon('home',18)} Google TV Home</button>${c.apps.map((app,i)=>`<button class="app" data-action="app" data-index="${i}" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}"><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>
+      <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app on your selected Google TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps"><button class="app tv-home" data-action="home" aria-label="Return ${esc(tv?.name || 'selected TV')} to Google TV Home" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}">${icon('home',18)} Google TV Home</button>${c.apps.map((app,i)=>`<button class="app" data-action="app" data-index="${i}" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}"><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${Object.hasOwn(paths,app.icon||"")?icon(app.icon,18):esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>
       <footer class="footer"><div class="live"><i class="dot"></i>${this.demoMode?'Preview · actions are simulated':this._hass?.connected===false?'Home Assistant disconnected':'Connected to Home Assistant'}<span>· ${esc(c.time_zone)}</span></div><div class="footer-actions">${c.edge_to_edge?`<button class="text-button" data-action="fullscreen">${this._exitFullscreen?'Expand dashboard':'Exit full screen'}</button>`:''}${auto?`<span><button class="toggle ${auto.state==='on'?'on':''}" data-action="auto" role="switch" aria-checked="${auto.state==='on'}" aria-label="Automatic dashboard" ${!['on','off'].includes(auto.state)?'disabled':''}></button>Auto dashboard</span>`:''}<button class="text-button" data-action="cast" ${!tv?'disabled':''} aria-disabled="${this._busy}">${icon('cast',12)} Show dashboard</button></div></footer>
     </div></ha-card>`);
     this.scheduleFit();
@@ -548,7 +552,7 @@ class HomeboardTVEditor extends HTMLElement {
     form.hass=this._hass; form.data={...this._config,home_sensor_entities:homeSensorIds(this._config)};
     form.schema=[
       {name:'tv_mode',selector:{boolean:{}}},
-      {name:'theme',selector:{select:{options:[{value:'aurora',label:'Aurora · brighter blues & mint'},{value:'forest',label:'Forest · warm greens'}]}}},
+      {name:'theme',selector:{select:{options:[{value:'aurora',label:'Aurora · brighter blues & mint'},{value:'aurora-green',label:'Aurora green · deep sea greens & mint'},{value:'aurora-teak',label:'Aurora teak · sea green with teak & tulip'},{value:'nordic-green',label:'Nordic green · sea green, cream & ochre'},{value:'forest',label:'Forest · warm greens'},{value:'nordic',label:'Nordic · muted vintage blues'},{value:'linen',label:'Linen · light day theme'},{value:'teak',label:'Teak · warm evening theme'}]}}},
       {name:'edge_to_edge',selector:{boolean:{}}},
       {name:'keyboard_navigation',selector:{boolean:{}}},
       {name:'home_name',selector:{text:{}}},{name:'title',selector:{text:{}}},{name:'time_zone',selector:{text:{}}},{name:'locale',selector:{text:{}}},
