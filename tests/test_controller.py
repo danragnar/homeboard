@@ -528,4 +528,28 @@ class WebOSControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.controller.home_until,0)
         self.assertEqual(self.hass.services.calls,[])
 
+    async def test_webos_source_launch_validates_names_before_grace(self):
+        self.controller.config['app_launch_method']='webostv'
+        self.states['media_player.lg'].attributes['source_list']=['Netflix','SVT Play','TV4 Play','YouTube']
+        context=object()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            for source in ['netflix','Missing']:
+                with self.assertRaises(ValueError):await self.controller.launch(target={'type':'source','source':source})
+            self.assertEqual(self.controller.suspended_until,0)
+            self.assertEqual(self.hass.services.calls,[])
+            await self.controller.launch(context=context,target={'type':'source','source':'Netflix'})
+        self.assertEqual(self.hass.services.calls[0][0],('media_player','select_source',{'entity_id':'media_player.lg','source':'Netflix'}))
+        self.assertIs(self.hass.services.calls[0][1]['context'],context)
+        self.assertEqual(self.controller.reason,'app grace period')
+
+    async def test_webos_source_launch_checks_offline_and_missing_source_list(self):
+        self.controller.config['app_launch_method']='webostv'
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            with self.assertRaises(ValueError):await self.controller.launch(target={'type':'source','source':'Netflix'})
+            self.states['media_player.lg'].attributes['source_list']=['Netflix']
+            self.states['media_player.lg'].state='off'
+            with self.assertRaises(ValueError):await self.controller.launch(target={'type':'source','source':'Netflix'})
+        self.assertEqual(self.controller.suspended_until,0)
+        self.assertEqual(self.hass.services.calls,[])
+
 if __name__=='__main__': unittest.main()

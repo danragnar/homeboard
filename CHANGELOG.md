@@ -1,5 +1,10 @@
 # Changes
 
+## 0.11.1
+
+- Add native LG source-name shortcuts so existing app names can launch through media_player.select_source without discovering app IDs. Validate source names and TV availability before starting app grace.
+- Explain disabled shortcut buttons in the card and clarify that selecting webOS does not convert existing Android activity fields. Improve the launch validation error with the correct target format.
+
 ## 0.11.0
 
 - Add configurable Android TV Remote and LG webOS app launching, including app IDs, content IDs and app-specific parameters, browser URLs and HA script targets.

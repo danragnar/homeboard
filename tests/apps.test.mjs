@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DEFAULT_CONFIG,shortcutTarget,appLaunchMethod,validateShortcuts} from '../custom_components/homeboard_tv/frontend/model.mjs';
+import {DEFAULT_CONFIG,shortcutTarget,appLaunchMethod,validateShortcuts,shortcutSetupHint} from '../custom_components/homeboard_tv/frontend/model.mjs';
 globalThis.HTMLElement=class {};
 globalThis.customElements={define(){}};
 globalThis.window={};
@@ -45,4 +45,20 @@ test('Config validates platform destinations, nested app params and script fallb
    {name:'Bad URL',target:{type:'url',url:'javascript:alert(1)'}}, {name:'Wrong script',target:{type:'script',entity_id:'scene.movie'}},
    {name:'Bad params',target:{...media,params:[]}}, {name:'Typo',target:{...media,contentID:'42'}}]) assert.throws(()=>validateShortcuts({apps:[app]}));
  assert.throws(()=>validateShortcuts({tvs:[{apps:'bad'}]}));
+});
+test('Native source shortcuts select the configured TV and preserve source names',async()=>{
+ const {card,calls}=fixture();const target={type:'source',source:'SVT Play'};
+ card._config.apps=[{name:'SVT Play',target}];validateShortcuts(card._config);
+ assert.equal(shortcutTarget({target},'androidtv_remote'),null);
+ assert.deepEqual(shortcutTarget({target},'webostv'),target);
+ await click(card);assert.deepEqual(calls,[['homeboard_tv','launch_app',{entry_id:'lg',target}]]);
+ assert.throws(()=>validateShortcuts({apps:[{name:'Wrong',target:{type:'source',source:''}}]}));
+ assert.throws(()=>validateShortcuts({apps:[{name:'Wrong',targets:{androidtv_remote:target}}]}));
+});
+test('Disabled shortcut hints distinguish unsupported Android activities from disabled app controls',()=>{
+ const tv={app_launch_method:'webostv'},apps=[{name:'Netflix',activity:'Netflix'}];
+ assert.match(shortcutSetupHint(tv,apps),/Existing activity fields are Android-only/);
+ assert.match(shortcutSetupHint({...tv,launch_apps:false},apps),/launch_apps/);
+ assert.equal(shortcutSetupHint(tv,[{name:'Netflix',target:{type:'source',source:'Netflix'}}]),'');
+ assert.equal(shortcutSetupHint(null,apps),'');
 });

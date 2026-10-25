@@ -13,6 +13,15 @@ tvs:
     #   - name: TV-specific sequence
     #     target: {type: script, entity_id: script.play_living_room_episode}
 apps:
+  - name: Netflix
+    targets:
+      androidtv_remote:
+        type: activity
+        activity: netflix://
+      webostv:
+        type: source
+        # Must match the LG entity source_list exactly.
+        source: Netflix
   - name: Open streaming app
     targets:
       androidtv_remote:

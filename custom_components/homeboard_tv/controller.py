@@ -261,10 +261,12 @@ class Controller:
             domain, service, data = launch_call(self.config, activity, target)
         except ValueError as exc:
             raise ServiceValidationError(str(exc)) from exc
-        if domain == "webostv":
+        if domain == "webostv" or (domain, service) == ("media_player", "select_source"):
             state = self.hass.states.get(data["entity_id"])
             if not state or state.state in OFFLINE:
                 raise ServiceValidationError("LG webOS TV unavailable; app command was not sent")
+            if service == "select_source" and data["source"] not in (state.attributes.get("source_list") or []):
+                raise ServiceValidationError("Unknown LG source name. Copy the exact app name from this TV's source_list attribute; enable the source in the LG integration if it is missing.")
         self.returned_to_launcher = False
         self.suspended_until = monotonic() + self.config.get("app_grace_seconds", 600)
         self.awaiting_dashboard = False

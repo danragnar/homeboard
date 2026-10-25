@@ -34,7 +34,7 @@ def launch_call(config, activity=None, target=None):
             raise ValueError("Activity must be a nonempty string")
         if method == "webostv":
             if not activity.startswith(("http://", "https://")):
-                raise ValueError("Configure a webOS app target instead of an Android activity")
+                raise ValueError("This screen already uses LG webOS. Replace activity with target: {type: source, source: '<TV source name>'}, or use an app target with app_id for media deep links.")
             target = {"type": "url", "url": activity}
         else:
             target = {"type": "activity", "activity": activity}
@@ -44,11 +44,21 @@ def launch_call(config, activity=None, target=None):
     fields = {
         "activity": {"type", "activity"},
         "app": {"type", "app_id", "content_id", "params"},
+        "source": {"type", "source"},
         "url": {"type", "url"},
         "script": {"type", "entity_id", "variables"},
     }
     if not isinstance(kind, str) or kind not in fields or set(target) - fields[kind]:
         raise ValueError("Unknown shortcut type or fields")
+    if kind == "source":
+        if method != "webostv":
+            raise ValueError("Source targets require LG webOS app launching")
+        if not _text(target.get("source")):
+            raise ValueError("Source target needs a TV source name from source_list")
+        entity = config.get("webos_entity")
+        if not entity:
+            raise ValueError("Configure an LG webOS TV entity for this screen first")
+        return "media_player", "select_source", {"entity_id": entity, "source": target["source"]}
     if kind == "script":
         entity = target.get("entity_id")
         if not isinstance(entity, str) or not re.fullmatch(r"script\.[a-z0-9_]+", entity):

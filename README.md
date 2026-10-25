@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.11.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.11.1`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.11.0.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.11.1.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -284,6 +284,8 @@ Netflix starts with `netflix://`. SVT and TV4 start with their public HTTPS link
 
 In each screen's integration options, choose **App launch and Home control method**: **Android TV Remote** or **LG webOS**. Set its remote or LG TV entity. Dashboard browser launching remains independently configurable. For rooted webOS with a custom home screen, optionally enter its verified **LG home launcher app ID**.
 
+**Migrating existing LG shortcuts:** changing the screen's launch method does not convert the card's `activity` fields. Those fields are Android-only in the card, so existing shortcuts are disabled on webOS until you supply a native target. For ordinary app opening, replace `activity: Netflix` with `target: {type: source, source: Netflix}`. Use the exact, case-sensitive app name from the LG TV entity's `source_list` attribute. If an app is missing, enable it in the LG integration's Sources options. Use `target: {type: url, url: 'https://...'}` for an intentional browser page. The card shows a setup hint beside disabled shortcuts.
+
 In the card editor's advanced JSON or YAML, a shortcut can use `targets` keyed by `androidtv_remote` and `webostv`. A common `target` works for a shared browser URL or script. Existing `activity` values remain Android-only fallbacks. The card reads the app launch method from the TV's `auto_entity` switch; if you do not map that switch, set the card TV's `app_launch_method` to match the integration. The backend always validates against the integration's configured method. A shortcut without a compatible target is disabled, rather than guessing how an Android link should work on LG.
 
 ```yaml
@@ -304,6 +306,7 @@ apps:
 | Target type | Fields | Behavior |
 | --- | --- | --- |
 | `activity` | `activity` | Android app link or package ID through the configured remote. |
+| `source` | `source` | Open an installed LG app by its exact `source_list` name using `media_player.select_source`. No app ID is required. |
 | `app` | `app_id`, optional `content_id` and `params` | LG `system.launcher/launch`; `content_id` becomes `contentId` and `params` is passed unchanged. Omit both optional fields to open just the app. |
 | `url` | `url` | Full credential-free HTTP(S) URL, opened through Android Remote or LG's browser according to the app launch method. |
 | `script` | `entity_id`, optional `variables` | Start an HA `script.*` entity with app grace applied. Use for provider-specific sequences. |
@@ -340,7 +343,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.11.0.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.11.1.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

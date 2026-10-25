@@ -183,17 +183,28 @@ export function appLaunchMethod(tv, states = {}) {
 }
 export function shortcutTarget(app, method) {
   const target = app?.targets?.[method] || app?.target || (method === 'androidtv_remote' && app?.activity ? {type:'activity',activity:app.activity} : null);
-  if ((target?.type==='app' && method!=='webostv') || (target?.type==='activity' && method!=='androidtv_remote')) return null;
+  if ((['app','source'].includes(target?.type) && method!=='webostv') || (target?.type==='activity' && method!=='androidtv_remote')) return null;
   return target;
+}
+export function shortcutSetupHint(tv, apps, states = {}) {
+  if (!tv) return '';
+  if (tv.launch_apps===false) return 'App controls are disabled for this TV. Set launch_apps to true in the card configuration.';
+  const method=appLaunchMethod(tv,states);
+  const missing=apps.filter(app=>!shortcutTarget(app,method)).length;
+  if (!missing) return '';
+  return method==='webostv'
+    ? 'Add webOS targets to the disabled shortcuts: use a source target for an installed app, an app target for media deep links, or a URL target for a browser page. Existing activity fields are Android-only.'
+    : 'Add Android targets to the disabled shortcuts. If this is a webOS TV, check its app launch method and the auto-dashboard switch selected in this card.';
 }
 export function validateShortcuts(config) {
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const text = value => typeof value === 'string' && value.trim() && value === value.trim();
   function validateTarget(target, method) {
-    const fields={activity:['type','activity'],app:['type','app_id','content_id','params'],url:['type','url'],script:['type','entity_id','variables']};
+    const fields={activity:['type','activity'],app:['type','app_id','content_id','params'],source:['type','source'],url:['type','url'],script:['type','entity_id','variables']};
     if (!object(target) || !Object.hasOwn(fields,target.type) || Object.keys(target).some(k=>!fields[target.type].includes(k))) throw new Error('Unknown shortcut target type or fields');
     if (target.type==='activity' && (!text(target.activity) || method==='webostv')) throw new Error('Activity targets require an Android activity');
     if (target.type==='app' && (!text(target.app_id) || method==='androidtv_remote')) throw new Error('App targets require a webOS app_id');
+    if (target.type==='source' && (!text(target.source) || method==='androidtv_remote')) throw new Error('Source targets require a webOS source name');
     if (target.content_id!==undefined && !text(target.content_id)) throw new Error('content_id must be a nonempty string');
     for (const key of ['params','variables']) if (target[key]!==undefined && !object(target[key])) throw new Error(`${key} must be an object`);
     if (target.type==='url' && !musicURL(target.url,true)) throw new Error('Shortcut url must be a full HTTP(S) URL without credentials');

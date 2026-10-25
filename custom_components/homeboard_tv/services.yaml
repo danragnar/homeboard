@@ -10,7 +10,7 @@ show_dashboard:
           integration: homeboard_tv
 launch_app:
   name: Launch app or media
-  description: Pause automatic dashboard opening, then launch an Android activity, webOS app/media, browser URL, or HA script. Provide exactly one of activity or target.
+  description: Pause automatic dashboard opening, then launch an Android activity, webOS source/app/media, browser URL, or HA script. Provide exactly one of activity or target.
   fields:
     entry_id:
       name: Screen configuration
@@ -25,7 +25,7 @@ launch_app:
         text:
     target:
       name: App or media target
-      description: "An object with type: activity, app, url, or script. webOS app fields: app_id, optional content_id and params. URL field: url. Script fields: entity_id and optional variables."
+      description: "An object with type: activity, source, app, url, or script. Source targets need the exact source name from the LG TV source_list. webOS app fields: app_id, optional content_id and params. URL field: url. Script fields: entity_id and optional variables."
       selector:
         object:
 return_home:

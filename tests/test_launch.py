@@ -32,6 +32,14 @@ class LaunchTests(unittest.TestCase):
         self.assertEqual(launch.launch_call(self.webos,target={'type':'url','url':url}),expected)
         self.assertEqual(launch.launch_call(self.webos,url),expected)
 
+    def test_webos_app_source_uses_select_source(self):
+        target={'type':'source','source':'Netflix'}
+        self.assertEqual(launch.launch_call(self.webos,target=target),('media_player','select_source',{'entity_id':'media_player.lg','source':'Netflix'}))
+        for config in [self.android,{'app_launch_method':'webostv'}]:
+            with self.assertRaises(ValueError):launch.launch_call(config,target=target)
+        for value in ['',None,' Netflix ']:
+            with self.assertRaises(ValueError):launch.launch_call(self.webos,target={'type':'source','source':value})
+
     def test_script_fallback_works_for_both_platforms_without_tv_control(self):
         target={'type':'script','entity_id':'script.play_episode','variables':{'episode':42}}
         for config in [{},{'app_launch_method':'webostv'}]:
