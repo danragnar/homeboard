@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased
+## 0.7.0
 
 - Combine indoor temperatures and locks into Home sensors, with automatic type detection, unit-aware readings, binary sensor statuses, and a unified entity picker. Existing selections carry over.
 
