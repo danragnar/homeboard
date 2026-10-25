@@ -306,16 +306,19 @@ export class HomeboardTVCard extends HTMLElement {
     const x = time => left + (time-start)/(end-start)*width;
     const y = value => top + height - (value-min)/range*height;
     const zero=y(0);
-    const guides=[min,(min+max)/2,max].map(n => `<line x1="${left}" x2="${left+width}" y1="${y(n)}" y2="${y(n)}" stroke="#ffffff0d"/><text x="${left-7}" y="${y(n)+3}" text-anchor="end">${this.fmt(n,1)}</text>`).join('');
+    // Axis text lives outside the stretched SVG so it keeps its proportions.
+    const guideValues=[min,(min+max)/2,max];
+    const guides=guideValues.map(n => `<line x1="${left}" x2="${left+width}" y1="${y(n)}" y2="${y(n)}" vector-effect="non-scaling-stroke" style="stroke:var(--chart-guide)"/>`).join('');
+    const yLabels=guideValues.map(n => `<span class="chart-y ${n===guideValues[1]?'mid':''}" style="top:calc((100% - var(--axis-row)) * ${y(n)/130});width:${(left-5)/710*100}%">${this.fmt(n,1)}</span>`).join('');
     const bars=rows.map(r => {
       const band=priceBand(r.value,rows), current=r===summary.current;
-      const color=current?'#f3f5e9':band==='low'?'#c7e7a5':band==='high'?'#e5b36d':'#6e8b75';
+      const color=current?'now':band==='low'?'low':band==='high'?'high':'mid';
       const w=Math.max(.5,x(+r.end)-x(+r.start)-1.5);
-      return `<rect x="${x(+r.start)}" y="${Math.min(zero,y(r.value))}" width="${w}" height="${Math.max(1,Math.abs(y(r.value)-zero))}" rx="1.5" fill="${color}"><title>${esc(this.time(r.start))}–${esc(this.time(r.end))}: ${esc(this.fmt(r.value,3))} ${esc(this._config.price_unit)}</title></rect>`;
+      return `<rect x="${x(+r.start)}" y="${Math.min(zero,y(r.value))}" width="${w}" height="${Math.max(1,Math.abs(y(r.value)-zero))}" rx="1.5" style="fill:var(--chart-${color})"><title>${esc(this.time(r.start))}–${esc(this.time(r.end))}: ${esc(this.fmt(r.value,3))} ${esc(this._config.price_unit)}</title></rect>`;
     }).join('');
     const indices=[0,Math.floor(rows.length*.25),Math.floor(rows.length*.5),Math.floor(rows.length*.75),rows.length-1];
-    const labels=indices.map((i,j)=>`<text x="${x(j===4 ? +rows[i].end : +rows[i].start)}" y="149" text-anchor="${j===0?'start':j===4?'end':'middle'}">${esc(this.time(j===4 ? rows[i].end : rows[i].start))}</text>`).join('');
-    return `<svg viewBox="0 0 710 159" preserveAspectRatio="none" role="img" aria-label="Today's electricity price. Lowest ${esc(this.fmt(summary.low.value,3))} at ${esc(this.time(summary.low.start))}; highest ${esc(this.fmt(summary.high.value,3))} at ${esc(this.time(summary.high.start))} ${esc(this._config.price_unit)}">${guides}${bars}${labels}</svg>`;
+    const labels=indices.map((i,j)=>`<span class="chart-x ${j===0?'start':j===4?'end':''}" style="left:${x(j===4 ? +rows[i].end : +rows[i].start)/710*100}%">${esc(this.time(j===4 ? rows[i].end : rows[i].start))}</span>`).join('');
+    return `<svg viewBox="0 0 710 130" preserveAspectRatio="none" role="img" aria-label="Today's electricity price. Lowest ${esc(this.fmt(summary.low.value,3))} at ${esc(this.time(summary.low.start))}; highest ${esc(this.fmt(summary.high.value,3))} at ${esc(this.time(summary.high.start))} ${esc(this._config.price_unit)}">${guides}${bars}</svg><div aria-hidden="true">${yLabels}${labels}</div>`;
   }
   musicPanel() {
     const music = this._config.music_assistant;
