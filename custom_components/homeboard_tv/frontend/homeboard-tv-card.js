@@ -1,4 +1,4 @@
-import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, homeSensorIds, homeSensors, sceneStatus, zonedDate, calendarEvents, validateMusic, musicURL, musicNowPlaying, musicCommand} from './model.mjs';
+import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, homeSensorIds, homeSensors, sceneStatus, zonedDate, calendarEvents, dressingAdvice, validateMusic, musicURL, musicNowPlaying, musicCommand} from './model.mjs';
 import {navigationKey, directionalTarget} from './navigation.mjs';
 import {patchHTML} from './dom.mjs';
 import {styles} from './styles.mjs';
@@ -22,6 +22,9 @@ const paths = {
  sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5',
  cloud:'M6 18a4 4 0 1 1 1-7.9A6 6 0 0 1 19 12a3 3 0 1 1 0 6Z',
  rain:'M6 15a4 4 0 1 1 1-7.9A6 6 0 0 1 19 9a3 3 0 1 1 0 6M8 18l-1 3m6-3-1 3m6-3-1 3',
+ snow:'M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M7 5l5 3 5-3M7 19l5-3 5 3',
+ shirt:'M8 4 5 7l-2 2 4 4 2-2v9h6v-9l2 2 4-4-2-2-3-3c-2 2-6 2-8 0Z',
+ jacket:'M9 3 5 6l-2 5 4 2 2-3v11h6V10l2 3 4-2-2-5-4-3m-3 0 3 5 3-5M12 8v13',
  lock:'M6 10h12v11H6ZM8 10V6a4 4 0 0 1 8 0v4M12 14v3',
  shield:'m12 2 9 4v6c0 5-9 10-9 10S3 17 3 12V6ZM8 12l3 3 5-6',
  scene:'m12 3 2.8 5.7L21 9.8l-4.5 4.4 1 6.3-5.5-3-5.5 3 1-6.3L3 9.8l6.2-1.1Z',
@@ -440,6 +443,11 @@ export class HomeboardTVCard extends HTMLElement {
     const sensors=homeSensors(states,c);
     const temp=temperatureMean(states,sensors.filter(item=>item.type==='temperature').map(item=>item.id),c.temperature_unit);
     const weather=states[c.weather_entity];
+    const dressing=dressingAdvice(weather?.attributes?.temperature,weather?.state,weather?.attributes?.temperature_unit || c.temperature_unit);
+    const weatherWords={sunny:'soligt',clear:'klart','clear-night':'klart',partlycloudy:'halvmulet',cloudy:'molnigt',fog:'dimmigt',rainy:'regnigt',pouring:'regnigt','lightning-rainy':'regnigt',snowy:'snöigt','snowy-rainy':'snöblandat'};
+    const clothes=dressing.items.map(item=>`<strong>${esc(item.replace(/^./, letter=>letter.toLowerCase()))}</strong>`);
+    const clothesText=clothes.length > 1 ? `${clothes.slice(0,-1).join(', ')} och ${clothes.at(-1)}` : clothes[0];
+    const dressingText=dressing.headline === 'Kolla vädret först' ? 'Väderdata saknas. Kolla hur det känns ute innan ni väljer kläder.' : `I dag är det ${this.fmt(weather.attributes.temperature,0)} ${esc(weather.attributes.temperature_unit || c.temperature_unit)} och ${esc(weatherWords[weather.state] || String(weather.state || '').replaceAll('_',' '))} ute. Då är det bra att ta på sig ${clothesText}.`;
     const agenda=calendarEvents(this._calendarEvents,c,now), calendar=states[c.calendar_entity];
 
     const tv=this.tv(), auto=tv?.auto_entity ? states[tv.auto_entity] : null;
@@ -468,8 +476,7 @@ export class HomeboardTVCard extends HTMLElement {
         <section class="card weather"><div class="card-head"><span class="card-title">${icon('sun')} A look outside</span><span class="reduced">${esc(c.weather_location || c.home_name)}</span></div><div class="forecast-current"><div><div class="weather-temp">${this.fmt(weather?.attributes?.temperature,0)}<span class="unit">${esc(weather?.attributes?.temperature_unit||c.temperature_unit)}</span></div><div class="condition">${esc((weather?.state === 'partlycloudy' ? 'Partly cloudy' : (weather?.state || 'Weather not configured').replaceAll('-',' ')))}</div></div><div class="weather-symbol">${icon(weatherIcon(weather?.state || ''),48)}</div></div>
           <div class="forecast">${forecast.length?forecast.map(f=>`<div class="forecast-day">${esc(c.forecast_type==='hourly'?this.time(f.datetime):new Date(f.datetime).toLocaleDateString(c.locale,{timeZone:c.time_zone,weekday:'short'}))}${icon(weatherIcon(f.condition||''),20)}<strong>${this.fmt(f.temperature,0)}°</strong>${f.templow!==undefined?`<small>${this.fmt(f.templow,0)}°</small>`:''}</div>`).join(''):`<div class="empty" style="grid-column:1/-1;padding:0">${esc(this._weatherError || 'Choose a weather entity for the forecast.')}</div>`}</div>
         </section>
-
-        <section class="card scenes"><div class="card-head"><span class="card-title">${icon('scene')} Set the mood</span><span class="reduced">SCENES</span></div><div class="scene-list">${c.scenes.length?c.scenes.map((scene,i)=>{const status=sceneStatus(states,scene,c);return `<button class="scene ${status==='Active'?'active':''}" data-action="scene" data-index="${i}" aria-disabled="${this._busy}"><span class="scene-top">${icon(scene.icon || 'scene',18)}${status==='Active'?'<i class="dot" style="color:var(--mint)"></i>':''}</span><span class="scene-name">${esc(scene.name || states[scene.entity]?.attributes?.friendly_name || scene.entity)}</span><span class="scene-status">${esc(status)}</span></button>`}).join(''):'<div class="empty">Add scenes and optional activity helpers.</div>'}</div></section>
+        <section class="card dressing"><div class="card-head"><span class="card-title">Hur ska vi klä på oss idag?</span><span class="reduced">UT I DAG</span></div><div class="dressing-copy ${this.demoMode?'has-visual':''}"><div class="dressing-words"><div class="dressing-main"><span class="dressing-kicker">JUST NU</span><strong>${esc(dressing.headline)}</strong></div><p class="dressing-text">${dressingText}</p></div>${this.demoMode?'<img class="dressing-visual" src="/preview/assets/dressing-jacket.png" alt="Bildstöd: jacka">':''}</div></section>
       </main>
       ${this.musicPanel()}
       <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app on your selected Google TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps"><button class="app tv-home" data-action="home" aria-label="Return ${esc(tv?.name || 'selected TV')} to Google TV Home" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}">${icon('home',18)} Google TV Home</button>${c.apps.map((app,i)=>`<button class="app" data-action="app" data-index="${i}" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}"><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${Object.hasOwn(paths,app.icon||"")?icon(app.icon,18):esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>

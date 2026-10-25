@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Dressing guide checks</title><style>body{font:14px system-ui}iframe{width:960px;height:540px;border:0}</style><h1>Dressing guide checks</h1><pre id="result">Running…</pre><iframe title="Sample dashboard" src="./dashboard.html"></iframe><script type="module">
+const frame=document.querySelector('iframe'),result=document.querySelector('#result'),passed=[];
+const assert=(ok,message)=>{if(!ok)throw Error(message);};
+try {
+ await new Promise(r=>frame.addEventListener('load',r,{once:true}));
+ const card=frame.contentDocument.querySelector('homeboard-tv-card'),root=card.shadowRoot,original=card._hass;
+ const update=(temperature,state='cloudy',temperature_unit='°C')=>{card.hass={...original,states:{...original.states,[card._config.weather_entity]:{state,attributes:{temperature,temperature_unit}}}};};
+ update(32,'cloudy','°F');assert(root.querySelector('.dressing-main').textContent.includes('Kallt ute'),'Fahrenheit advice incorrect');assert(root.querySelector('.dressing-text').textContent.includes('32 °F'),'Observation unit missing');
+ update(-7,'snowy-rainy');assert(root.querySelector('.dressing-text').textContent.includes('mössa och vantar'),'Warm winter layers missing');assert(root.querySelector('.dressing-text').textContent.includes('snöblandat'),'HA condition not translated');
+ update(9,'unavailable');assert(root.querySelector('.dressing-text').textContent.includes('Väderdata saknas'),'Stale unavailable observation used');
+ update(null);assert(root.querySelector('.dressing-text').textContent.includes('Väderdata saknas'),'Missing temperature used');
+ passed.push('PASS · live Fahrenheit, winter layers, HA conditions and unavailable/missing observations');
+ card.demoMode=false;card.render();assert(!root.querySelector('.dressing-visual'),'Preview image used in production');assert(!root.querySelector('.dressing-copy').classList.contains('has-visual'),'Empty illustration column retained');
+ for(const theme of ['aurora','forest','linen','teak']){card.setConfig({...card._config,theme});const style=frame.contentWindow.getComputedStyle(root.querySelector('.dressing'));assert(style.backgroundImage!=='none',`Missing ${theme} background`);}
+ passed.push('PASS · production text layout and merged theme styles');result.textContent=passed.join('\n')+'\nAll checks passed. Sample data only.';
+}catch(error){result.textContent=passed.join('\n')+'\nFAIL · '+error.message;}
+</script></html>

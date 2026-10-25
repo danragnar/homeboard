@@ -10,7 +10,7 @@ try {
  assert(root.querySelectorAll('.agenda-event').length===3,'Three sample events missing');
  assert(root.querySelector('.calendar').textContent.includes('All day'),'All-day event missing');
  assert(root.querySelector('.energy .power-value').textContent.includes('1.84'),'Power not in electricity card');
- assert(root.querySelectorAll('main .card').length===6,'Expected six dashboard panels');
+ assert(root.querySelectorAll('main .card').length===5,'Expected five dashboard panels with unified Home sensors');
  passed.push('PASS · agenda, all-day labels and combined electricity/power render');
  for(const [width,height] of [[1920,1080],[1280,720],[960,540],[390,844]]) {
   frame.style.width=width+'px';frame.style.height=height+'px';await settle();card.fitTV();
