@@ -1,0 +1,37 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Home sensors checks</title><style>body{font:14px system-ui;background:#17283e;color:white}iframe{border:0;position:absolute;left:0;top:220px;transform:scale(.2);transform-origin:top left}</style><h1>Home sensors checks</h1><pre id="result">Running…</pre><iframe title="Sample dashboard" src="./dashboard.html"></iframe><script type="module">
+const result=document.querySelector('#result'),frame=document.querySelector('iframe'),passed=[];
+const assert=(ok,message)=>{if(!ok)throw Error(message);};
+const settle=()=>new Promise(r=>setTimeout(r,100));
+try {
+ await new Promise(r=>frame.addEventListener('load',r,{once:true}));await settle();
+ const card=frame.contentDocument.querySelector('homeboard-tv-card'),root=card.shadowRoot,config=card._config;
+ assert(root.querySelectorAll('.home-sensors').length===1,'Unified card missing');
+ assert(!root.querySelector('.security,.metric'),'Old cards remain');
+ assert(root.querySelectorAll('.sensor-item').length===8,'Configured sensors missing');
+ assert(root.querySelector('.sensor-average').textContent.includes('21.3'),'Indoor average missing');
+ assert(root.querySelector('.sensor-list').textContent.includes('Closed'),'Window status missing');
+ passed.push('PASS · unified card, indoor average, typed readings and legacy selections');
+ for(const [width,height] of [[1920,1080],[1280,720],[960,540],[390,844]]) {
+  frame.style.width=width+'px';frame.style.height=height+'px';await settle();card.fitTV();
+  const shell=root.querySelector('.shell').getBoundingClientRect();
+  assert(shell.right<=width+2,`Horizontal overflow at ${width}`);
+  if(width>=740) assert(shell.bottom<=height+2,`Vertical overflow at ${width}`);
+  const sensors=root.querySelector('.home-sensors').getBoundingClientRect();
+  for(const item of root.querySelectorAll('.sensor-item')){const rect=item.getBoundingClientRect();assert(rect.right<=sensors.right+1 && rect.bottom<=sensors.bottom+1,`Sensor overflow at ${width}`);}
+  passed.push(`PASS · layout at ${width} × ${height}`);
+ }
+ const editor=frame.contentDocument.createElement('homeboard-tv-editor');editor.setConfig(config);editor.hass=card._hass;
+ const form=editor.shadowRoot.querySelector('ha-form');
+ assert(form.data.home_sensor_entities.length===8,'Legacy selections missing in picker');
+ form.dispatchEvent(new frame.contentWindow.CustomEvent('value-changed',{detail:{value:{...form.data,home_sensor_entities:['lock.front_door']}}}));
+ assert(editor._config.home_sensor_entities.length===1 && editor._config.lock_entities.length===0 && editor._config.temperature_entities.length===0,'Picker removal did not migrate legacy selections');
+ passed.push('PASS · unified picker migration and removal');
+ const original=card._hass;card.hass={...original,states:{...original.states,'lock.front_door':{state:'unavailable',attributes:{friendly_name:'Front <door>'}}}};
+ assert(root.querySelector('.sensor-list').textContent.includes('Unavailable'),'Unavailable state missing');
+ assert(root.querySelector('.sensor-list').textContent.includes('Front <door>'),'Entity name not escaped');
+ card.setConfig({...config,home_sensor_entities:[],temperature_entities:[],lock_entities:[]});
+ assert(root.querySelector('.home-sensors .empty'),'Empty state missing');assert(!root.querySelector('.sensor-average'),'Empty average shown');
+ passed.push('PASS · live unavailable state, escaped names and empty configuration');
+ result.textContent=passed.join('\n')+'\nAll checks passed.';
+} catch(error){result.textContent=passed.join('\n')+'\nFAIL · '+error.message;}
+</script></html>

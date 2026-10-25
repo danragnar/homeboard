@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Homeboard · Remote navigation checks</title><style>body{margin:0;background:#17283e;color:white;font:14px system-ui}header{padding:16px}button{font:inherit;padding:10px}#result{white-space:pre-wrap}#dom-test{position:fixed;left:0;top:0;z-index:-1}</style></head><body><header><h1>Remote navigation regression checks</h1><button id="run">Run checks</button><p>Simulated service calls: <output id="service-count">0</output></p><pre id="result" role="status">Ready. Uses simulated Home Assistant data only.</pre></header><div id="dom-test"></div><homeboard-tv-card></homeboard-tv-card><script type="module">
-import {patchHTML} from '../custom_components/homeboard_tv/frontend/dom.mjs?v=0.5.0';
-import '../custom_components/homeboard_tv/frontend/homeboard-tv-card.js?preview=0.5.0';
+import {patchHTML} from '../custom_components/homeboard_tv/frontend/dom.mjs?v=0.7.0';
+import '../custom_components/homeboard_tv/frontend/homeboard-tv-card.js?preview=0.7.0';
 const card=document.querySelector('homeboard-tv-card'), result=document.querySelector('#result'), root=document.querySelector('#dom-test');
 card.demoMode=true;
 const state=value=>({state:String(value),attributes:{unit_of_measurement:'W'}});

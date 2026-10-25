@@ -29,7 +29,7 @@ Once the repository is published:
 If you manage **resources** in YAML, add the resource below to your existing `lovelace.resources` list instead. Homeboard logs a reminder and leaves YAML resource configuration under your control:
 
 ```yaml
-- url: /homeboard_tv/0.5.0/homeboard-tv-card.js
+- url: /homeboard_tv/0.7.0/homeboard-tv-card.js
   type: module
 ```
 
@@ -63,19 +63,40 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.5.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.8.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.5.0.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.8.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
-## Music Assistant shortcuts
+## Music Assistant player and shortcuts
 
-The optional music box has separate **Play** and **Open** actions for each saved playlist, **Open Music Assistant** for the full interface, and an optional **Open on TV** button. Add this in the card editor's advanced JSON (as a `music_assistant` object) or in Lovelace YAML:
+Choose a **Music Assistant player** in the card's visual editor. The picker lists players provided by Home Assistant's Music Assistant integration; Homeboard uses the existing authenticated HA connection. No Music Assistant server URL, separate login or token is required for the embedded player or playlist playback. An entity alone is enough:
 
 ```yaml
 music_assistant:
-  url: https://music.example/#/home?player=Livingroom
+  player_entity: media_player.music_assistant_living_room
+```
+
+The embedded player shows album artwork, track, artist, album and playing/paused/buffering status from that entity. Previous, play/pause, next, volume and mute controls appear when supported by the player. Changes made in Music Assistant, on a phone or elsewhere in HA update the dashboard. Idle and unavailable players clear stale track information. Opening the dashboard sends no playback or volume commands. Audio plays on the selected Music Assistant player; this is a dashboard control/display, not a second audio stream in the browser.
+
+Favorite playlists load automatically from the selected player's Music Assistant integration using [`music_assistant.get_library`](https://www.home-assistant.io/actions/music_assistant.get_library/). Each shows its name, artwork (or a music icon when unavailable), and a **Play** button. Play starts that playlist on the selected player and replaces its queue. The visual editor offers **Show favorite playlists** and **Maximum favorite playlists** (default 6; 0 shows all). All favorites are fetched in pages, sorted by name, and refreshed every five minutes; **Refresh favorites** picks up changes immediately. Loading the dashboard only reads the library.
+
+```yaml
+music_assistant:
+  player_entity: media_player.music_assistant_living_room
+  show_favorites: true
+  max_playlists: 6  # 0 = all favorites
+```
+
+The integration instance is detected from the selected player's entity registry entry. If needed, set `music_assistant.config_entry_id` in advanced configuration to the Music Assistant integration entry ID. Favorite loading requires an HA Music Assistant integration that provides the `get_library` action. Errors appear beside the refresh button; playback controls and saved shortcuts remain available. Manually configured `playlists` stay visible in addition to the favorite limit and can include an optional `image` HTTP(S) URL or HA path.
+
+The optional music box also has separate **Play** and **Open** actions for each saved playlist, **Open Music Assistant** for the full interface, and an optional **Open on TV** button. Add this in the card editor's advanced JSON (as a `music_assistant` object) or in Lovelace YAML:
+
+```yaml
+music_assistant:
+  # Optional shortcut to the full interface; unnecessary for playback/now playing.
+  # url: https://music.example/#/home?player=Livingroom
   player_entity: media_player.music_assistant_living_room
   playlists:
     - name: Evening favourites
@@ -91,6 +112,8 @@ Replace every example destination. Install the [Music Assistant HA integration](
 Open navigates **the browser displaying the card**. For Music Assistant installed as a Home Assistant app, `url` can instead be your actual sidebar path starting with `/`; Homeboard navigates within HA, whose sidebar loads the authenticated interface. Copy the actual sidebar path from your installation rather than using a temporary `/api/hassio_ingress/...` session URL. An absolute Music Assistant URL opens its web interface in the same browser and needs its own working login. Playlist links only navigate; they do not auto-play. Copy their exact URLs from Music Assistant. [Music Assistant documents URLs](https://www.music-assistant.io/faq/how-to/) for selecting a player, opening playlists, and showing Now Playing, for example `https://music.example/#/home?player=Livingroom&showFullscreenPlayer=true`. Omit `music_assistant` or set it to `null` to hide the box.
 
 To offer **Open on TV**, add `music_assistant_url: https://music.example/#/home?player=Livingroom` to the relevant existing `tvs` item. It must be a full HTTP(S) URL. The button uses that TV entry's existing `homeboard_tv.launch_app` action, Android TV remote and app-launch grace period; `launch_apps: false` hides it. A compatible browser such as TV Bro must be installed, handle the link, and already be signed in. Link routing and Music Assistant's own remote-control usability need testing on the device. For LG without an Android TV remote, use your existing webOS browser script separately.
+
+**Keeping the dashboard visible while music plays.** The embedded player stays inside Homeboard and does not navigate away. Use a separate speaker/player, or leave Homeboard open in a TV browser while music plays on a player that does not displace that browser. A browser dashboard can display and control any configured Music Assistant player, but does not itself become a Music Assistant audio player. Native audio playback on that same TV can still bring another app to the foreground, depending on the TV.
 
 **Cast and browser displays differ.** [Music Assistant's Google Cast provider](https://www.music-assistant.io/player-support/google-cast/) can play to the TV/Cast player using its Music Assistant Cast receiver and metadata display. That receiver is not the full interactive Music Assistant browser interface. [Home Assistant Cast](https://cast.home-assistant.io/faq.html) displays Lovelace views; this feature does not cast arbitrary Music Assistant web pages or embed its authenticated UI into the receiver. Use Homeboard on a phone/computer to trigger playlist playback, or use a TV browser for the full Music Assistant UI. Playing on the same Cast receiver replaces the dashboard's Cast session. Playing to a separate speaker can leave the TV dashboard visible.
 
@@ -144,6 +167,14 @@ For script transport, configure `dashboard_script` and an `idle_guard` binary se
 
 The LG browser needs its own authenticated HA session. Sign in on the TV using an appropriate HA account. Browser engine, cookies, HTTPS support, and modern JavaScript vary with webOS versions. Opening a URL successfully does not establish that HA rendered or logged in. The native integration does not make every LG model a Chromecast. See [webOS commands](https://www.home-assistant.io/actions/webostv.command/).
 
+## Return to Google TV Home
+
+The **Google TV Home** button beside the streaming-app shortcuts sends `HOME` through the selected TV entry's configured Android TV remote. It works with Browser and Cast dashboard transports. It does not use a launcher package ID or send a power command. The button is disabled when no TV is selected or the card TV entry has `launch_apps: false`; the integration validates that its remote is configured and online before sending the command. On a Cast dashboard, use the phone/computer dashboard controls if the receiver does not accept pointer/remote interaction.
+
+Exiting also pauses automatic dashboard reopening for that entry's `app_grace_seconds` (10 minutes by default). Returning to the launcher does not cancel this explicit exit pause. Afterwards, normal power, playback, foreground, cooldown and stable-idle checks apply. **Show dashboard** clears the pause early and still requires a safely idle screen. Turn **Auto dashboard** off if you want to keep automatic reopening disabled until you turn it on again. The temporary exit pause is in memory and resets if the integration restarts; the Auto dashboard switch persists across restarts.
+
+The same action is available as `homeboard_tv.return_home` with the screen's `entry_id`. The auto-dashboard switch exposes `exit_remaining_seconds` and status `dashboard exit pause`. A successful action confirms command dispatch, not which screen the TV actually rendered. The standalone preview only simulates this action and does not navigate or control a TV.
+
 ## Idle behavior
 
 Defaults: **45 seconds stable idle**, **5 minutes between automatic attempts**, **10 minutes grace after app launch**.
@@ -164,7 +195,7 @@ An LG opening script is dispatched through `script.turn_on`; the integration rep
 
 ## Dashboard configuration
 
-The visual card editor provides entity selectors for price, power, temperature sensors, weather, and locks. Advanced JSON in that editor (or normal Lovelace YAML) configures scenes, TV entries, app activities, and all remaining fields. All configuration belongs to the HA card, not browser-local storage. Only the standalone **demo** stores its preview configuration locally.
+The visual card editor provides entity selectors for price, power, weather, and Home sensors (sensor, binary sensor, and lock entities). Advanced JSON in that editor (or normal Lovelace YAML) configures scenes, TV entries, app activities, and all remaining fields. All configuration belongs to the HA card, not browser-local storage. Only the standalone **demo** stores its preview configuration locally.
 
 | Option | Meaning |
 | --- | --- |
@@ -179,15 +210,16 @@ The visual card editor provides entity selectors for price, power, temperature s
 | `power_entity` | Instantaneous consumption sensor; W becomes kW above 1,000 W. Other units are preserved. Use power, not accumulated kWh. |
 | `calendar_entity` | Home Assistant `calendar.*` entity to show, including remote calendars already synced to HA. Empty by default; choose in the visual editor. |
 | `calendar_days`, `calendar_max_events` | Look ahead 1–31 days (default 7); show 1–10 events (default 3). |
-| `temperature_entities`, `temperature_unit` | Mean of valid Celsius/Fahrenheit readings, converted to `°C` or `°F`. Missing/incompatible values are excluded and the reporting count is shown. |
+| `home_sensor_entities` | Entity IDs in the unified Home sensors box. Types are detected from the entity domain and device class: temperature, humidity, locks, door/window contacts, motion, battery, and other sensor values. Values retain their units; binary sensors use meaningful status labels. Unknown/missing entities show Unavailable. All sensors are view only. |
+| `temperature_unit` | Convert temperature readings and the indoor average to `°C` (default) or `°F`. Invalid/incompatible readings are excluded from the average and reporting count. |
+| `temperature_entities`, `lock_entities` | Legacy selections are merged into Home sensors without duplicates. Saving the visual editor migrates them to `home_sensor_entities`. |
 | `weather_entity`, `forecast_type` | Forecast subscription; choose `daily`, `hourly`, or `twice_daily` supported by your provider. |
-| `lock_entities` | Read-only lock states. Unknown locks never count as secured. |
 | `scenes` | Objects with `entity`, optional `name`, `icon`, `active_entity`. |
-| `theme` | `aurora` (default): brighter blue panels with mint, lilac and warm accents. `forest`: green palette. |
+| `theme` | `aurora` (default): blue and mint. `aurora-green`: sea green and mint. `aurora-teak`: sea green with teak and tulip accents. `nordic-green`: sea green, cream and ochre. `forest`: warm greens. `nordic`: muted vintage blues. `linen`: light day palette. `teak`: warm evening palette. |
 | `edge_to_edge` | `true` fills the viewport above HA navigation using the browser top layer and removes the outer card border in TV mode. Older browsers without top-layer support use fixed positioning, which may still be constrained by the host layout. Default `false`. Escape or **Exit full screen** returns to HA navigation; **Expand dashboard** re-enters. Disabled inside the HA card editor. |
 | `keyboard_navigation` | Arrow-key spatial navigation, default `true`; requires a browser/receiver that forwards key events. |
 | `tvs` | Objects with `name`, `entry_id`, optional `auto_entity`, `launch_apps`. Set `launch_apps: false` on an LG-only entry without an Android remote. |
-| `apps` | Objects with `name`, `activity`, optional hexadecimal `color`. Add/reorder freely. |
+| `apps` | Objects with `name`, `activity`, optional hexadecimal `color` and built-in `icon` (for example `fire`). Add/reorder freely. |
 
 Scene icons supported: `sun`, `moon`, `tv`, `bolt`, `home`, `scene`, `temp`, `lock`, `shield`, `cloud`, `rain`, `cast`, `power`.
 
@@ -251,7 +283,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.5.0.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.8.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

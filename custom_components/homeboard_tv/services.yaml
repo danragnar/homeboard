@@ -24,3 +24,13 @@ launch_app:
       example: "netflix://"
       selector:
         text:
+return_home:
+  name: Return to Google TV Home
+  description: Send HOME to the configured Android TV remote and pause automatic dashboard reopening for the app-grace period (10 minutes by default).
+  fields:
+    entry_id:
+      name: Screen configuration
+      required: true
+      selector:
+        config_entry:
+          integration: homeboard_tv

@@ -1,5 +1,20 @@
 # Changes
 
+## 0.8.0
+
+- Load Music Assistant favorite playlists automatically with names, artwork, playback, refresh, and a configurable display limit (0 shows all).
+
+## 0.7.0
+
+- Combine indoor temperatures and locks into Home sensors, with automatic type detection, unit-aware readings, binary sensor statuses, and a unified entity picker. Existing selections carry over.
+
+## 0.6.0
+
+- Add a Google TV Home button and `homeboard_tv.return_home` action, with a temporary exit pause that survives browser-to-launcher detection.
+- Embed a native Music Assistant now-playing panel with album art, track, artist, album and playback state from the HA media player entity.
+- Add supported transport, volume and mute controls through HA; no Music Assistant URL or iframe is needed.
+- Add a visual Music Assistant integration player picker and document the same-Cast-receiver display limitation.
+
 ## 0.5.0
 
 - Add an optional Music Assistant box with playlist playback to an explicit player, playlist links and a full-interface link.

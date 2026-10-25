@@ -1,14 +1,23 @@
-import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, lockSummary, sceneStatus, zonedDate, calendarEvents, validateMusic} from './model.mjs';
+import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, homeSensorIds, homeSensors, sceneStatus, zonedDate, calendarEvents, validateMusic, musicURL, musicNowPlaying, musicCommand} from './model.mjs';
 import {navigationKey, directionalTarget} from './navigation.mjs';
 import {patchHTML} from './dom.mjs';
 import {styles} from './styles.mjs';
 
 const paths = {
+ play:'m8 4 13 8-13 8Z',
+ pause:'M8 4v16M16 4v16',
+ previous:'M5 4v16m14-16L7 12l12 8Z',
+ next:'M19 4v16M5 4l12 8-12 8Z',
  home:'M3 10 12 3l9 7M5 9v12h14V9M9 21v-7h6v7',
  bolt:'m13 2-9 12h7l-1 8 10-12h-7l1-8',
  fire:'M12 22c4 0 7-3 7-7 0-4-3-7-5-11-1 3-2 5-4 6 0-2-1-3-2-4-2 3-3 6-3 9 0 4 3 7 7 7Zm0 0c-2 0-3-1.5-3-3.5 0-2 1.5-3.5 3-5.5 1.5 2 3 3.5 3 5.5S14 22 12 22Z',
  calendar:'M3 5h18v16H3ZM7 3v4m10-4v4M3 10h18M7 14h2m4 0h4m-10 3h2',
  power:'M12 2v10M6 5a9 9 0 1 0 12 0',
+ humidity:'M12 3C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-12ZM9 16a3 3 0 0 0 3 3',
+ door:'M4 21h16M6 21V3h12v18M14 12h1',
+ motion:'M13 3h1M9 21l3-7 4 3v4M6 12l3-5 5 1 3 4h4M9 7l3 7',
+ battery:'M3 7h17v10H3ZM20 10h2v4M7 10v4m4-4v4m4-4v4',
+ sensor:'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M6 6a8 8 0 0 0 0 12M18 6a8 8 0 0 1 0 12M3 3a13 13 0 0 0 0 18M21 3a13 13 0 0 1 0 18',
  temp:'M9 14.5V5a3 3 0 0 1 6 0v9.5a5 5 0 1 1-6 0ZM12 8v9',
  sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5',
  cloud:'M6 18a4 4 0 1 1 1-7.9A6 6 0 0 1 19 12a3 3 0 1 1 0 6Z',
@@ -31,6 +40,7 @@ export class HomeboardTVCard extends HTMLElement {
   constructor() {
     super(); this.attachShadow({mode:'open'}); this._config = {...DEFAULT_CONFIG};
     this._calendarEvents = []; this._calendarGeneration = 0;
+    this._musicFavorites = []; this._musicGeneration = 0;
     this._forecast = []; this._weatherGeneration = 0; this._selectedTV = 0; this._busy = false; this._notice = '';
     this._onResize = () => this.scheduleFit();
     this._onKey = event => this.navigate(event);
@@ -44,6 +54,7 @@ export class HomeboardTVCard extends HTMLElement {
       if (width !== this._lastWidth) { this._lastWidth = width; this.scheduleFit(); }
     });
     this.shadowRoot.addEventListener('click', e => this.onClick(e));
+    this.shadowRoot.addEventListener('error', e => { if (e.target.matches?.('.music-art img')) e.target.hidden=true; }, true);
     this.shadowRoot.addEventListener('change', e => {
       if (e.target.matches('[data-tv]')) { this._selectedTV = Number(e.target.value); this.render(); }
     });
@@ -60,7 +71,7 @@ export class HomeboardTVCard extends HTMLElement {
   static getConfigElement() { return document.createElement('homeboard-tv-editor'); }
   static getStubConfig() { return {...DEFAULT_CONFIG}; }
   setConfig(config) {
-    for (const key of ['temperature_entities','lock_entities','scenes','tvs','apps']) {
+    for (const key of ['home_sensor_entities','temperature_entities','lock_entities','scenes','tvs','apps']) {
       if (config[key] !== undefined && !Array.isArray(config[key])) throw new Error(`${key} must be a list`);
     }
     const next = {...DEFAULT_CONFIG, ...config};
@@ -74,20 +85,22 @@ export class HomeboardTVCard extends HTMLElement {
     for (const [key,max] of [['calendar_days',31],['calendar_max_events',10]]) {
       if (!Number.isInteger(next[key]) || next[key] < 1 || next[key] > max) throw new Error(`${key} must be an integer from 1 to ${max}`);
     }
+    if (homeSensorIds(next).some(id => typeof id !== 'string' || !/^(sensor|binary_sensor|lock)\.[a-z0-9_]+$/.test(id))) throw new Error('Home sensors must be sensor, binary_sensor or lock entity IDs');
     validateMusic(next);
     this._config = next;
     this.setAttribute('theme', next.theme);
     this._selectedTV = Math.min(this._selectedTV, Math.max(0,next.tvs.length-1));
-    if (this._hass && this.isConnected) { this.subscribeWeather(); this.refreshCalendar(); }
+    if (this._hass && this.isConnected) { this.subscribeWeather(); this.refreshCalendar(); this.refreshMusicFavorites(); }
     this.render();
   }
   set hass(hass) {
     const previous = this._hass; this._hass = hass;
     if (this.isConnected && (!previous || previous.connection !== hass.connection)) this.subscribeWeather();
     if (this.isConnected && (!previous || previous.connection !== hass.connection || previous.connected !== hass.connected || previous.states?.[this._config.calendar_entity] !== hass.states?.[this._config.calendar_entity])) this.refreshCalendar(true);
+    if (this.isConnected && (!previous || previous.connection !== hass.connection || previous.connected !== hass.connected)) this.refreshMusicFavorites(true);
     const ids = new Set([this._config.price_entity,this._config.power_entity,this._config.weather_entity,this._config.calendar_entity,
       this._config.music_assistant?.player_entity,
-      ...this._config.temperature_entities,...this._config.lock_entities,
+      ...homeSensorIds(this._config),
       ...this._config.scenes.flatMap(scene => [scene.entity,scene.active_entity]),
       ...this._config.tvs.map(tv => tv.auto_entity)].filter(Boolean));
     if (!this._drawer && (!previous || previous.connected !== hass.connected || [...ids].some(id => previous.states?.[id] !== hass.states?.[id]))) this.render();
@@ -161,8 +174,8 @@ export class HomeboardTVCard extends HTMLElement {
     window.addEventListener('resize', this._onResize);
     window.addEventListener('keydown', this._onKey, true);
     window.addEventListener('keyup', this._onKeyUp, true);
-    this._timer = setInterval(() => { this.refreshCalendar(); if (!this._drawer) this.render(); }, 30000);
-    if (this._hass) { this.subscribeWeather(); this.refreshCalendar(); }
+    this._timer = setInterval(() => { this.refreshCalendar(); this.refreshMusicFavorites(); if (!this._drawer) this.render(); }, 30000);
+    if (this._hass) { this.subscribeWeather(); this.refreshCalendar(); this.refreshMusicFavorites(); }
     this.render();
   }
   disconnectedCallback() {
@@ -172,6 +185,7 @@ export class HomeboardTVCard extends HTMLElement {
     window.removeEventListener('keyup', this._onKeyUp, true);
     cancelAnimationFrame(this._fitFrame);
     clearInterval(this._timer); this._weatherGeneration++; this._calendarGeneration++;
+    this._musicGeneration++; this._musicKey = null; this._musicPending = false;
     this._calendarKey = null; this._calendarPending = false;
     this._weatherUnsub?.(); this._weatherUnsub = null; this._weatherKey = null;
   }
@@ -321,6 +335,71 @@ export class HomeboardTVCard extends HTMLElement {
     const labels=indices.map((i,j)=>`<span class="chart-x ${j===0?'start':j===4?'end':''}" style="left:${x(j===4 ? +rows[i].end : +rows[i].start)/710*100}%">${esc(this.time(j===4 ? rows[i].end : rows[i].start))}</span>`).join('');
     return `<svg viewBox="0 0 710 130" preserveAspectRatio="none" role="img" aria-label="Today's electricity price. Lowest ${esc(this.fmt(summary.low.value,3))} at ${esc(this.time(summary.low.start))}; highest ${esc(this.fmt(summary.high.value,3))} at ${esc(this.time(summary.high.start))} ${esc(this._config.price_unit)}">${guides}${bars}</svg><div aria-hidden="true">${yLabels}${labels}</div>`;
   }
+  async refreshMusicFavorites(force = false) {
+    const music = this._config.music_assistant;
+    const entity = music?.player_entity;
+    const enabled = Boolean(entity && music.show_favorites !== false);
+    const connection = this._hass?.connection;
+    const key = JSON.stringify([enabled, entity, music?.config_entry_id]);
+    if (key !== this._musicKey || connection !== this._musicConnection) {
+      this._musicGeneration = (this._musicGeneration || 0) + 1;
+      this._musicFavorites = []; this._musicError = ''; this._musicFetched = null; this._musicPending = false;
+      this._musicKey = key; this._musicConnection = connection;
+    }
+    if (!enabled || !this.isConnected || this.demoMode || !this._hass?.callWS || this._hass.connected === false || this._musicPending) return;
+    if (!force && this._musicFetched != null && Date.now() - this._musicFetched < 300000) return;
+    const generation = ++this._musicGeneration;
+    const hass = this._hass;
+    this._musicPending = true; this._musicError = ''; this.render();
+    try {
+      const entry = music.config_entry_id || (await hass.callWS({type:'config/entity_registry/get', entity_id:entity}))?.config_entry_id;
+      if (!entry) throw new Error('No Music Assistant integration found for this player');
+      const favorites = [], seen = new Set();
+      for (let offset = 0; ; offset += 100) {
+        if (generation !== this._musicGeneration || !this.isConnected) return;
+        const result = await hass.callWS({type:'call_service', domain:'music_assistant', service:'get_library',
+          service_data:{config_entry_id:entry, media_type:'playlist', favorite:true, order_by:'name', limit:100, offset}, return_response:true});
+        if (generation !== this._musicGeneration || !this.isConnected) return;
+        const items = result?.response?.items;
+        if (!Array.isArray(items)) throw new Error('Invalid favorite playlist response');
+        let added = 0;
+        for (const item of items) {
+          if (typeof item.uri !== 'string' || !item.uri || typeof item.name !== 'string' || item.favorite === false || seen.has(item.uri)) continue;
+          seen.add(item.uri); added++;
+          favorites.push({name:item.name, media_id:item.uri, image:musicURL(item.image)?item.image:''});
+        }
+        if (items.length < 100) break;
+        if (!added) throw new Error('Favorite playlist pagination did not advance');
+      }
+      this._musicFavorites = favorites;
+    } catch (error) {
+      if (generation !== this._musicGeneration) return;
+      this._musicError = `Favorites unavailable. Check the Music Assistant integration and get_library action. ${error.message || ''}`;
+    } finally {
+      if (generation === this._musicGeneration && this.isConnected) {
+        this._musicPending = false; this._musicFetched = Date.now(); this.render();
+      }
+    }
+  }
+  musicPlaylists() {
+    const music = this._config.music_assistant;
+    const manual = music?.playlists || [];
+    const favorites = music?.show_favorites === false ? [] : (this._musicFavorites || []).filter(item => !manual.some(saved => saved.media_id === item.media_id));
+    const limit = music?.max_playlists ?? 6;
+    const visible = limit === 0 ? favorites : favorites.slice(0, limit);
+    return [...manual, ...visible];
+  }
+  nowPlayingPanel(player) {
+    const music = this._config.music_assistant;
+    if (!music?.player_entity) return '';
+    const info = musicNowPlaying(player);
+    const artwork = info.artwork.startsWith('/') ? (this._hass?.hassUrl?.(info.artwork) || info.artwork) : info.artwork;
+    const controls = [
+      ['previous','Previous track',icon('previous',16)],['toggle',['playing','buffering'].includes(player?.state)?'Pause':'Resume',icon(['playing','buffering'].includes(player?.state)?'pause':'play',16)],['next','Next track',icon('next',16)],
+      ['quieter','Volume down','−'],['louder','Volume up','+'],['mute',player?.attributes?.is_volume_muted?'Unmute':'Mute',player?.attributes?.is_volume_muted?'Unmute':'Mute']
+    ];
+    return `<div class="now-playing"><div class="music-art">${icon('music',28)}${artwork?`<img src="${esc(artwork)}" alt="" referrerpolicy="no-referrer">`:''}</div><div class="music-track"><div class="music-state">${esc(info.status)}</div><div class="music-track-title">${esc(info.title)}</div>${info.artist?`<div class="music-artist">${esc(info.artist)}</div>`:''}${info.album?`<div class="music-album">${esc(info.album)}</div>`:''}</div><div class="music-transport" role="group" aria-label="Music playback controls">${controls.filter(([control])=>musicCommand(player,control)).map(([control,label,text])=>`<button class="music-control ${control==='toggle'?'primary':''}" data-action="music-control" data-index="${control}" aria-label="${label}" aria-disabled="${this._busy}">${text}</button>`).join('')}${info.volume!==null?`<span class="music-volume">${info.volume}%</span>`:''}</div></div>`;
+  }
   musicPanel() {
     const music = this._config.music_assistant;
     if (!music) return '';
@@ -329,7 +408,9 @@ export class HomeboardTVCard extends HTMLElement {
     const disabled = `aria-disabled="${this._busy}"`;
     return `<section class="card music"><div class="card-head"><span class="card-title">${icon('music')} Music Assistant</span><div class="music-links">${music.url?`<button class="text-button" data-action="music-open" ${disabled}>Open Music Assistant ${icon('arrow',12)}</button>`:''}${tv?.music_assistant_url && tv.launch_apps!==false?`<button class="text-button" data-action="music-tv" ${disabled}>Open on TV · ${esc(tv.name)} ${icon('tv',12)}</button>`:''}</div></div>
       <div class="music-destination">${music.player_entity?`Play on ${esc(player?.attributes?.friendly_name || music.player_entity)}${canPlay?'':' · unavailable'}`:'Choose a Music Assistant player to enable playback'}</div>
-      <div class="music-playlists">${(music.playlists || []).map((item,i)=>`<div class="music-playlist"><span class="music-name">${icon('music',16)}${esc(item.name)}</span><div class="music-links">${item.media_id?`<button class="music-play" data-action="music-play" data-index="${i}" aria-label="Play ${esc(item.name)}" ${canPlay?'':'disabled'} ${disabled}>▶ Play</button>`:''}${item.url?`<button class="text-button" data-action="music-playlist" data-index="${i}" aria-label="Open ${esc(item.name)}" ${disabled}>Open ${icon('arrow',12)}</button>`:''}</div></div>`).join('') || '<div class="empty">Add your favourite playlists in the card configuration.</div>'}</div></section>`;
+      ${this.nowPlayingPanel(player)}
+      ${music.player_entity && music.show_favorites !== false?`<div class="music-favorites-status"><span role="status">${this._musicError?esc(this._musicError):this._musicPending?'Loading favorite playlists…':this._musicFetched!=null?`${this._musicFavorites?.length || 0} favorite playlists${(music.max_playlists ?? 6)>0?` · showing up to ${music.max_playlists ?? 6}`:''}`:''}</span><button class="text-button" data-action="music-refresh" ${this._musicPending?'disabled':''}>Refresh favorites</button></div>${!this._musicPending && !this._musicError && this._musicFetched!=null && !this._musicFavorites?.length?'<div class="empty">No favorite playlists. Mark playlists as favorites in Music Assistant, then refresh.</div>':''}`:''}
+      <div class="music-playlists">${this.musicPlaylists().map((item,i)=>`<div class="music-playlist"><span class="music-name"><span class="music-art playlist-art">${icon('music',20)}${musicURL(item.image)?`<img src="${esc(item.image.startsWith('/')?(this._hass?.hassUrl?.(item.image)||item.image):item.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}</span>${esc(item.name)}</span><div class="music-links">${item.media_id?`<button class="music-play" data-action="music-play" data-index="${i}" aria-label="Play ${esc(item.name)}" ${canPlay?'':'disabled'} ${disabled}>▶ Play</button>`:''}${item.url?`<button class="text-button" data-action="music-playlist" data-index="${i}" aria-label="Open ${esc(item.name)}" ${disabled}>Open ${icon('arrow',12)}</button>`:''}</div></div>`).join('')}</div></section>`;
   }
   openMusicURL(url) {
     if (this.demoMode) { this._notice='Demo link simulated. No page or device was opened.'; this.render(); return; }
@@ -356,10 +437,11 @@ export class HomeboardTVCard extends HTMLElement {
     const band=priceBand(current,rows);
     const power=states[c.power_entity], powerValue=finite(power?.state), powerUnit=power?.attributes?.unit_of_measurement || 'W';
     const showKW=powerUnit==='W' && powerValue!==null && Math.abs(powerValue)>=1000;
-    const temp=temperatureMean(states,c.temperature_entities,c.temperature_unit);
+    const sensors=homeSensors(states,c);
+    const temp=temperatureMean(states,sensors.filter(item=>item.type==='temperature').map(item=>item.id),c.temperature_unit);
     const weather=states[c.weather_entity];
     const agenda=calendarEvents(this._calendarEvents,c,now), calendar=states[c.calendar_entity];
-    const locks=lockSummary(states,c.lock_entities);
+
     const tv=this.tv(), auto=tv?.auto_entity ? states[tv.auto_entity] : null;
     const period=(row,high=false)=>`<div class="period"><div><div class="period-label">${high?'↗ Highest':'↘ Lowest'}</div><div class="period-time">${row?`${esc(this.time(row.start))}–${esc(this.time(row.end))}`:'—'}</div></div><div class="period-price ${high?'high':''}">${this.fmt(row?.value,3)}<small>${esc(c.price_unit)}</small></div></div>`;
     const date=now.toLocaleDateString(c.locale,{timeZone:c.time_zone,weekday:'long',day:'numeric',month:'long'});
@@ -379,15 +461,18 @@ export class HomeboardTVCard extends HTMLElement {
         <section class="card calendar"><div class="card-head"><span class="card-title">${icon('calendar')} Coming up</span><span class="reduced">NEXT ${c.calendar_days} DAYS</span></div><div class="calendar-source">${esc(calendar?.attributes?.friendly_name || c.calendar_entity || 'Your calendar')}</div>
           <div class="agenda">${!c.calendar_entity?'<div class="empty">Choose a Home Assistant calendar in the card editor.</div>':this._calendarError || !calendar || ['unknown','unavailable'].includes(calendar.state)?`<div class="empty">${esc(this._calendarError || 'Calendar unavailable. Check the entity and its connection.')}</div>`:agenda.length?agenda.map(event=>`<div class="agenda-event"><div class="agenda-when">${esc(this.calendarWhen(event))}</div><div class="agenda-title">${esc(event.summary)}</div>${event.location?`<div class="agenda-location">${esc(event.location)}</div>`:''}</div>`).join(''):`<div class="empty">${this._calendarPending?'Loading events…':'No upcoming events.'}</div>`}</div>
         </section>
-        <section class="card metric"><div class="card-head"><span class="card-title">${icon('temp')} Inside, on average</span></div><div class="stat-line"><div class="stat-number">${this.fmt(temp.value)}<span class="unit">${esc(c.temperature_unit)}</span></div><div class="mini-icon">${icon('home',24)}</div></div><div class="metric-note">${temp.count} of ${temp.total} temperature sensors reporting</div><div class="temperature-strip">${Array.from({length:Math.max(1,temp.total)},(_,i)=>`<i class="${i<temp.count?'filled':''}"></i>`).join('')}</div></section>
+        <section class="card home-sensors"><div class="card-head"><span class="card-title">${icon('home')} Home sensors</span><span class="reduced">LIVE · VIEW ONLY</span></div>
+          ${temp.total?`<div class="sensor-average"><div><div class="energy-label">Inside, on average</div><div class="stat-number">${this.fmt(temp.value)}<span class="unit">${esc(c.temperature_unit)}</span></div></div><span class="reduced">${temp.count}/${temp.total} reporting</span></div>`:''}
+          <div class="sensor-list">${sensors.length?sensors.map(sensor=>`<div class="sensor-item ${sensor.tone}"><span class="sensor-icon">${icon(sensor.icon,19)}</span><div class="sensor-detail"><div class="sensor-name" title="${esc(sensor.name)}">${esc(sensor.name)}</div><div class="sensor-value">${esc(sensor.value)}${sensor.unit?`<span class="unit">${esc(sensor.unit)}</span>`:''}</div></div></div>`).join(''):'<div class="empty">Choose home sensors in the card editor to see temperatures, locks and more.</div>'}</div>
+        </section>
         <section class="card weather"><div class="card-head"><span class="card-title">${icon('sun')} A look outside</span><span class="reduced">${esc(c.weather_location || c.home_name)}</span></div><div class="forecast-current"><div><div class="weather-temp">${this.fmt(weather?.attributes?.temperature,0)}<span class="unit">${esc(weather?.attributes?.temperature_unit||c.temperature_unit)}</span></div><div class="condition">${esc((weather?.state === 'partlycloudy' ? 'Partly cloudy' : (weather?.state || 'Weather not configured').replaceAll('-',' ')))}</div></div><div class="weather-symbol">${icon(weatherIcon(weather?.state || ''),48)}</div></div>
           <div class="forecast">${forecast.length?forecast.map(f=>`<div class="forecast-day">${esc(c.forecast_type==='hourly'?this.time(f.datetime):new Date(f.datetime).toLocaleDateString(c.locale,{timeZone:c.time_zone,weekday:'short'}))}${icon(weatherIcon(f.condition||''),20)}<strong>${this.fmt(f.temperature,0)}°</strong>${f.templow!==undefined?`<small>${this.fmt(f.templow,0)}°</small>`:''}</div>`).join(''):`<div class="empty" style="grid-column:1/-1;padding:0">${esc(this._weatherError || 'Choose a weather entity for the forecast.')}</div>`}</div>
         </section>
-        <section class="card security"><div class="card-head"><span class="card-title">${icon('lock')} Peace of mind</span><span class="pill ${locks.secured?'':'amber'}">${locks.items.length?`${locks.items.filter(i=>i.state==='locked').length}/${locks.items.length} secured`:'Not configured'}</span></div><div class="security-title">${icon('shield',31)}<div><strong>${locks.secured?'All doors secured':!locks.items.length?'Add your doors':locks.unknown?'Check door status':'A door needs attention'}</strong><small>Live lock status · view only</small></div></div>${locks.items.length?locks.items.map(lock=>`<div class="lock-row"><span>${esc(lock.name)}</span><span class="lock-state ${lock.state==='locked'?'':'warn'}">${icon('lock',12)}${esc(lock.state.charAt(0).toUpperCase()+lock.state.slice(1))}</span></div>`).join(''):'<div class="empty">Select your lock entities in the card editor.</div>'}</section>
+
         <section class="card scenes"><div class="card-head"><span class="card-title">${icon('scene')} Set the mood</span><span class="reduced">SCENES</span></div><div class="scene-list">${c.scenes.length?c.scenes.map((scene,i)=>{const status=sceneStatus(states,scene,c);return `<button class="scene ${status==='Active'?'active':''}" data-action="scene" data-index="${i}" aria-disabled="${this._busy}"><span class="scene-top">${icon(scene.icon || 'scene',18)}${status==='Active'?'<i class="dot" style="color:var(--mint)"></i>':''}</span><span class="scene-name">${esc(scene.name || states[scene.entity]?.attributes?.friendly_name || scene.entity)}</span><span class="scene-status">${esc(status)}</span></button>`}).join(''):'<div class="empty">Add scenes and optional activity helpers.</div>'}</div></section>
       </main>
       ${this.musicPanel()}
-      <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app on your selected Google TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps">${c.apps.map((app,i)=>`<button class="app" data-action="app" data-index="${i}" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}"><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${Object.hasOwn(paths,app.icon||"")?icon(app.icon,18):esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>
+      <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app on your selected Google TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps"><button class="app tv-home" data-action="home" aria-label="Return ${esc(tv?.name || 'selected TV')} to Google TV Home" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}">${icon('home',18)} Google TV Home</button>${c.apps.map((app,i)=>`<button class="app" data-action="app" data-index="${i}" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}"><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${Object.hasOwn(paths,app.icon||"")?icon(app.icon,18):esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>
       <footer class="footer"><div class="live"><i class="dot"></i>${this.demoMode?'Preview · actions are simulated':this._hass?.connected===false?'Home Assistant disconnected':'Connected to Home Assistant'}<span>· ${esc(c.time_zone)}</span></div><div class="footer-actions">${c.edge_to_edge?`<button class="text-button" data-action="fullscreen">${this._exitFullscreen?'Expand dashboard':'Exit full screen'}</button>`:''}${auto?`<span><button class="toggle ${auto.state==='on'?'on':''}" data-action="auto" role="switch" aria-checked="${auto.state==='on'}" aria-label="Automatic dashboard" ${!['on','off'].includes(auto.state)?'disabled':''}></button>Auto dashboard</span>`:''}<button class="text-button" data-action="cast" ${!tv?'disabled':''} aria-disabled="${this._busy}">${icon('cast',12)} Show dashboard</button></div></footer>
     </div></ha-card>`);
     this.scheduleFit();
@@ -403,25 +488,33 @@ export class HomeboardTVCard extends HTMLElement {
     if(action==='save-demo') { this.saveDemoSettings(); return; }
     if(action==='dismiss') { this._notice=''; this.render(); return; }
     if(this._busy) return;
+    if(action==='music-refresh') { await this.refreshMusicFavorites(true); return; }
     if(action==='music-open') { this.openMusicURL(c.music_assistant.url); return; }
-    if(action==='music-playlist') { this.openMusicURL(c.music_assistant.playlists[index].url); return; }
+    if(action==='music-playlist') { this.openMusicURL(this.musicPlaylists()[index].url); return; }
     this._busy=true; this.render();
     try {
+      if(action==='music-control') {
+        const id=c.music_assistant.player_entity;
+        const command=musicCommand(this._hass?.states?.[id],target.dataset.index);
+        if (!command) throw new Error('This playback control is unavailable');
+        await this._hass.callService('media_player',command.service,{entity_id:id,...command.data});
+      }
       if(action==='music-play') {
         const music=c.music_assistant;
         const player=this._hass?.states?.[music.player_entity];
         if (!player || ['unknown','unavailable'].includes(player.state)) throw new Error('Music Assistant player unavailable');
-        await this._hass.callService('music_assistant','play_media',{entity_id:music.player_entity,media_id:music.playlists[index].media_id,media_type:'playlist',enqueue:'replace'});
+        await this._hass.callService('music_assistant','play_media',{entity_id:music.player_entity,media_id:this.musicPlaylists()[index].media_id,media_type:'playlist',enqueue:'replace'});
       }
       if(action==='music-tv') await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,activity:this.tv().music_assistant_url});
       if(action==='scene') await this._hass.callService('scene','turn_on',{entity_id:c.scenes[index].entity});
       if(action==='app') await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,activity:c.apps[index].activity});
+      if(action==='home') await this._hass.callService('homeboard_tv','return_home',{entry_id:this.tv().entry_id});
       if(action==='cast') await this._hass.callService('homeboard_tv','show_dashboard',{entry_id:this.tv().entry_id});
       if(action==='auto') {
         const id=this.tv().auto_entity;
         await this._hass.callService('switch',this._hass.states[id]?.state==='on'?'turn_off':'turn_on',{entity_id:id});
       }
-      this._notice = this.demoMode ? 'Demo action simulated. No devices were controlled.' : action==='music-play'?'Playlist playback requested.':action==='music-tv'?'Music Assistant browser launch requested on the selected TV.':action==='app'?'App launch requested. Automatic casting is temporarily suspended.':action==='scene'?'Scene activation requested.':action==='cast'?'Dashboard dispatch requested.':'Automatic dashboard updated.';
+      this._notice = this.demoMode ? 'Demo action simulated. No devices were controlled.' : action==='home'?'Home requested. Automatic dashboard reopening is temporarily paused.':action==='music-control'?'Playback control requested.':action==='music-play'?'Playlist playback requested.':action==='music-tv'?'Music Assistant browser launch requested on the selected TV.':action==='app'?'App launch requested. Automatic casting is temporarily suspended.':action==='scene'?'Scene activation requested.':action==='cast'?'Dashboard dispatch requested.':'Automatic dashboard updated.';
     } catch(error) { this._notice = `Action failed: ${error.message || error}`; }
     finally {
       this._busy=false; this.render();
@@ -451,12 +544,12 @@ export class HomeboardTVCard extends HTMLElement {
 class HomeboardTVEditor extends HTMLElement {
   constructor() { super(); this.attachShadow({mode:'open'}); }
   setConfig(config) { this._config={...DEFAULT_CONFIG,...config}; this.render(); }
-  set hass(hass) { this._hass=hass; const form=this.shadowRoot.querySelector('ha-form'); if(form) form.hass=hass; }
+  set hass(hass) { this._hass=hass; for (const form of this.shadowRoot.querySelectorAll('ha-form')) form.hass=hass; }
   render() {
     if(!this._config) return;
-    this.shadowRoot.innerHTML='<style>:host{display:block}p{line-height:1.6;color:var(--secondary-text-color)}textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:12px;border-radius:8px;font-family:monospace}button{padding:10px;margin-top:8px}.error{color:var(--error-color)}</style><ha-form></ha-form><p>Advanced configuration: Music Assistant URL, player and playlists (music_assistant), scenes, TVs, apps, and custom price field mappings. Edit the JSON below, then apply.</p><textarea aria-label="Advanced card configuration"></textarea><button>Apply advanced configuration</button><p class="error" role="alert"></p>';
+    this.shadowRoot.innerHTML='<style>:host{display:block}p{line-height:1.6;color:var(--secondary-text-color)}textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:12px;border-radius:8px;font-family:monospace}button{padding:10px;margin-top:8px}.error{color:var(--error-color)}</style><ha-form></ha-form><p>Music Assistant: choose a player from the Home Assistant integration. Track information, controls and favorite playlists appear on the dashboard. Set maximum favorite playlists to 0 to show all. No URL is needed.</p><ha-form data-music-form></ha-form><p>Advanced configuration: optional Music Assistant interface links and playlists (music_assistant), scenes, TVs, apps, and custom price field mappings. Edit the JSON below, then apply.</p><textarea aria-label="Advanced card configuration"></textarea><button>Apply advanced configuration</button><p class="error" role="alert"></p>';
     const form=this.shadowRoot.querySelector('ha-form');
-    form.hass=this._hass; form.data=this._config;
+    form.hass=this._hass; form.data={...this._config,home_sensor_entities:homeSensorIds(this._config)};
     form.schema=[
       {name:'tv_mode',selector:{boolean:{}}},
       {name:'theme',selector:{select:{options:[{value:'aurora',label:'Aurora · brighter blues & mint'},{value:'aurora-green',label:'Aurora green · deep sea greens & mint'},{value:'aurora-teak',label:'Aurora teak · sea green with teak & tulip'},{value:'nordic-green',label:'Nordic green · sea green, cream & ochre'},{value:'forest',label:'Forest · warm greens'},{value:'nordic',label:'Nordic · muted vintage blues'},{value:'linen',label:'Linen · light day theme'},{value:'teak',label:'Teak · warm evening theme'}]}}},
@@ -469,15 +562,25 @@ class HomeboardTVEditor extends HTMLElement {
       {name:'calendar_entity',selector:{entity:{domain:'calendar'}}},
       {name:'calendar_days',selector:{number:{min:1,max:31,mode:'box'}}},
       {name:'calendar_max_events',selector:{number:{min:1,max:10,mode:'box'}}},
-      {name:'temperature_entities',selector:{entity:{domain:'sensor',multiple:true}}},
+      {name:'home_sensor_entities',selector:{entity:{domain:['sensor','binary_sensor','lock'],multiple:true}}},
       {name:'temperature_unit',selector:{select:{options:['°C','°F']}}},
       {name:'weather_entity',selector:{entity:{domain:'weather'}}},
       {name:'forecast_type',selector:{select:{options:['daily','hourly','twice_daily']}}},
-      {name:'lock_entities',selector:{entity:{domain:'lock',multiple:true}}},
+
     ];
-    form.computeLabel=s=>s.name.replaceAll('_',' ');
+    form.computeLabel=s=>s.name==='home_sensor_entities'?'Home sensors':s.name.replaceAll('_',' ');
     form.addEventListener('value-changed',event=>{
-      this._config={...this._config,...event.detail.value};
+      this._config={...this._config,...event.detail.value,temperature_entities:[],lock_entities:[]};
+      this.shadowRoot.querySelector('textarea').value=JSON.stringify(this._config,null,2);
+      this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));
+    });
+    const musicForm=this.shadowRoot.querySelector('[data-music-form]');
+    musicForm.hass=this._hass; musicForm.data={player_entity:this._config.music_assistant?.player_entity || '',show_favorites:this._config.music_assistant?.show_favorites ?? true,max_playlists:this._config.music_assistant?.max_playlists ?? 6};
+    musicForm.schema=[{name:'player_entity',selector:{entity:{filter:{domain:'media_player',integration:'music_assistant'}}}},{name:'show_favorites',selector:{boolean:{}}},{name:'max_playlists',selector:{number:{min:0,max:100,step:1,mode:'box'}}}];
+    musicForm.computeLabel=s=>({player_entity:'Music Assistant player',show_favorites:'Show favorite playlists',max_playlists:'Maximum favorite playlists (0 = all)'}[s.name]);
+    musicForm.addEventListener('value-changed',event=>{
+      const player_entity=event.detail.value.player_entity || '';
+      this._config={...this._config,music_assistant:{...this._config.music_assistant,...event.detail.value,player_entity}};
       this.shadowRoot.querySelector('textarea').value=JSON.stringify(this._config,null,2);
       this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));
     });

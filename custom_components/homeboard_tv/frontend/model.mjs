@@ -14,6 +14,39 @@ export function temperatureMean(states, ids = [], unit = "°C") {
   }).filter(n => n !== null);
   return {value: values.length ? values.reduce((a,b) => a+b, 0)/values.length : null, count: values.length, total: ids.length};
 }
+// Legacy selections stay visible alongside the unified entity list, without duplicates.
+export function homeSensorIds(config = {}) {
+  return [...new Set([...(config.home_sensor_entities || []), ...(config.temperature_entities || []), ...(config.lock_entities || [])])];
+}
+export function homeSensors(states, config = {}) {
+  return homeSensorIds(config).map(id => {
+    const entity = states[id], a = entity?.attributes || {}, state = entity?.state;
+    const domain = id.split('.')[0], kind = a.device_class || '';
+    const unavailable = !state || ['unknown','unavailable'].includes(state);
+    const label = value => String(value).replaceAll('_',' ').replace(/^./, c => c.toUpperCase());
+    let type = domain === 'lock' ? 'lock' : kind === 'temperature' || ['°C','°F'].includes(a.unit_of_measurement) ? 'temperature' : kind || domain;
+    let icon = ({temperature:'temp',humidity:'humidity',moisture:'humidity',door:'door',window:'door',opening:'door',motion:'motion',occupancy:'motion',presence:'motion',battery:'battery',power:'bolt',energy:'bolt',lock:'lock'})[type] || 'sensor';
+    let value = unavailable ? 'Unavailable' : label(state), unit = '', tone = unavailable ? 'muted' : 'normal';
+    if (!unavailable && domain === 'lock') tone = state === 'locked' ? 'good' : 'warn';
+    else if (!unavailable && domain === 'binary_sensor') {
+      const labels = ({door:['Closed','Open'],window:['Closed','Open'],opening:['Closed','Open'],motion:['Clear','Motion'],occupancy:['Clear','Occupied'],presence:['Away','Home'],moisture:['Dry','Wet'],smoke:['Clear','Smoke detected'],gas:['Clear','Gas detected'],safety:['Safe','Unsafe'],battery:['Normal','Low'],connectivity:['Disconnected','Connected'],problem:['Clear','Problem'],lock:['Locked','Unlocked']})[kind] || ['Off','On'];
+      value = ['on','off'].includes(state) ? labels[state === 'on' ? 1 : 0] : label(state);
+      if (['on','off'].includes(state)) tone = ['connectivity','presence','occupancy'].includes(kind) ? (state === 'on' ? 'good' : 'normal') : state === 'on' ? 'warn' : 'good';
+    } else if (!unavailable && domain === 'sensor') {
+      const numeric = finite(state);
+      if (numeric !== null) {
+        unit = a.unit_of_measurement || '';
+        let reading = numeric;
+        if (type === 'temperature' && ['°C','°F'].includes(unit)) {
+          const converted = temperatureMean(states,[id],config.temperature_unit || '°C');
+          reading = converted.value; unit = config.temperature_unit || '°C';
+        }
+        value = number(reading, type === 'temperature' ? 1 : Number.isInteger(reading) ? 0 : 1, config.locale || 'en-GB');
+      }
+    }
+    return {id, name:a.friendly_name || id, type, icon, value, unit, tone};
+  });
+}
 export function zonedDate(date, timeZone) {
   return new Intl.DateTimeFormat("en-CA", {timeZone, year:"numeric", month:"2-digit", day:"2-digit"}).format(date);
 }
@@ -96,16 +129,48 @@ export function musicURL(value, absolute = false) {
     return ['http:','https:'].includes(url.protocol) && Boolean(url.hostname) && !url.username && !url.password;
   } catch { return false; }
 }
+// HA MediaPlayerEntityFeature values; controls follow each player's capabilities.
+export function musicCommand(player, control) {
+  if (!player || ['unknown','unavailable'].includes(player.state)) return null;
+  const a = player.attributes || {}, features = Number(a.supported_features) || 0;
+  const has = bit => Boolean(features & bit);
+  if (control === 'toggle') {
+    const pause = ['playing','buffering'].includes(player.state);
+    return has(pause ? 1 : 16384) ? {service:pause?'media_pause':'media_play',data:{}} : null;
+  }
+  if (control === 'previous' || control === 'next') return has(control === 'previous'?16:32) ? {service:control === 'previous'?'media_previous_track':'media_next_track',data:{}} : null;
+  if (control === 'mute') return has(8) && typeof a.is_volume_muted === 'boolean' ? {service:'volume_mute',data:{is_volume_muted:!a.is_volume_muted}} : null;
+  if (control === 'quieter' || control === 'louder') {
+    if (has(1024)) return {service:control === 'louder'?'volume_up':'volume_down',data:{}};
+    const volume = finite(a.volume_level);
+    if (has(4) && volume !== null) return {service:'volume_set',data:{volume_level:Math.max(0,Math.min(1,volume+(control === 'louder'?.05:-.05)))}};
+  }
+  return null;
+}
+export function musicNowPlaying(player) {
+  const available = Boolean(player && !['unknown','unavailable'].includes(player.state));
+  const active = available && ['playing','paused','buffering'].includes(player.state);
+  const a = player?.attributes || {};
+  return {available, active, status:!available?'Unavailable':({playing:'Playing',paused:'Paused',buffering:'Buffering'})[player.state] || 'Idle',
+    title:!available?'Player unavailable':active?String(a.media_title || 'Track information unavailable'):'Nothing playing',
+    artist:active?String(a.media_artist || ''):'',album:active?String(a.media_album_name || ''):'',
+    artwork:active && musicURL(a.entity_picture)?a.entity_picture:'',
+    volume:available && finite(a.volume_level)!==null?Math.round(Math.max(0,Math.min(1,Number(a.volume_level)))*100):null};
+}
 export function validateMusic(config) {
   const music = config.music_assistant;
   if (music !== undefined && music !== null) {
     if (typeof music !== 'object' || Array.isArray(music)) throw new Error('music_assistant must be an object');
     if (music.url && !musicURL(music.url)) throw new Error('music_assistant.url must be an HTTP(S) URL or Home Assistant path');
     if (music.player_entity && (typeof music.player_entity !== 'string' || !/^media_player\.[a-z0-9_]+$/.test(music.player_entity))) throw new Error('music_assistant.player_entity must be a media_player entity ID');
+    if (music.show_favorites !== undefined && typeof music.show_favorites !== 'boolean') throw new Error('music_assistant.show_favorites must be a boolean');
+    if (music.max_playlists !== undefined && (!Number.isInteger(music.max_playlists) || music.max_playlists < 0 || music.max_playlists > 100)) throw new Error('music_assistant.max_playlists must be an integer from 0 to 100 (0 shows all)');
+    if (music.config_entry_id !== undefined && (typeof music.config_entry_id !== 'string' || !music.config_entry_id.trim())) throw new Error('music_assistant.config_entry_id must be a nonempty string');
     if (music.playlists !== undefined && !Array.isArray(music.playlists)) throw new Error('music_assistant.playlists must be a list');
     for (const item of music.playlists || []) {
       if (!item || typeof item.name !== 'string' || !item.name.trim() || (!item.media_id && !item.url)) throw new Error('Each music playlist needs a name and media_id or url');
       if (item.media_id !== undefined && (typeof item.media_id !== 'string' || !item.media_id.trim())) throw new Error('Playlist media_id must be a nonempty string');
+      if (item.image && !musicURL(item.image)) throw new Error('Playlist image must be an HTTP(S) URL or Home Assistant path');
       if (item.url && !musicURL(item.url)) throw new Error('Playlist url must be an HTTP(S) URL or Home Assistant path');
     }
   }
@@ -117,7 +182,7 @@ export const DEFAULT_CONFIG = {
   type:"custom:homeboard-tv-card", title:"A little more at home.", home_name:"Our home",
   tv_mode:true, theme:"aurora", edge_to_edge:false, keyboard_navigation:true, time_zone:"Europe/Stockholm", locale:"en-GB", temperature_unit:"°C", price_unit:"SEK/kWh",
   price_entity:"", price_attribute:"raw_today", price_value_key:"value", price_start_key:"start", price_end_key:"end",
-  price_factor:1, price_offset:0, power_entity:"", temperature_entities:[], weather_entity:"", forecast_type:"daily",
+  price_factor:1, price_offset:0, power_entity:"", home_sensor_entities:[], temperature_entities:[], weather_entity:"", forecast_type:"daily",
   music_assistant:null, calendar_entity:"", calendar_days:7, calendar_max_events:3, lock_entities:[], scenes:[], tvs:[], apps:[
     {name:"Netflix", activity:"netflix://", color:"#e50914"},
     {name:"SVT Play", activity:"https://www.svtplay.se", color:"#54cf87"},
