@@ -18,6 +18,7 @@ class Controller:
         self.task = None
         self.last_attempt = float("-inf")
         self.suspended_until = 0
+        self.home_until = 0
         self.listeners = set()
         self.last_error = None
         self.busy = False
@@ -33,11 +34,13 @@ class Controller:
 
     @property
     def reason(self):
+        if self.enabled and monotonic() < self.home_until:
+            return "dashboard exit pause"
         return idle_reason(self.config, self.snapshots(), self.enabled, monotonic() < self.suspended_until)
 
     @property
     def retry_reason(self):
-        return connection_retry_reason(self.config, self.snapshots(), self.enabled, monotonic() < self.suspended_until)
+        return connection_retry_reason(self.config, self.snapshots(), self.enabled, monotonic() < max(self.suspended_until, self.home_until))
 
     @property
     def ids(self):
@@ -123,8 +126,8 @@ class Controller:
         if reason != "ready" or self.busy:
             self.cancel_timer()
             # Wake once when app grace ends, even if no entity changes meanwhile.
-            remaining = self.suspended_until - monotonic()
-            if reason == "app grace period" and remaining > 0:
+            remaining = max(self.suspended_until, self.home_until) - monotonic()
+            if reason in {"app grace period", "dashboard exit pause"} and remaining > 0:
                 self.pending = async_call_later(self.hass, remaining, self.wake)
             return
         if self.pending:
@@ -259,6 +262,34 @@ class Controller:
             await self.hass.services.async_call("remote", "turn_on", {
                 "entity_id": remote, "activity": activity,
             }, blocking=True, context=context)
+
+    async def return_home(self, context=None):
+        """Leave the dashboard without immediately triggering another idle launch."""
+        from homeassistant.exceptions import ServiceValidationError
+        remote = self.config.get("remote_entity")
+        if not remote:
+            raise ServiceValidationError("Configure an Android TV remote entity for this TV first")
+        state = self.hass.states.get(remote)
+        if not state or state.state in OFFLINE:
+            raise ServiceValidationError("Android TV remote unavailable; Home command was not sent")
+        # Keep a separate pause: a browser-to-launcher transition intentionally
+        # clears app-launch grace, but must not undo the user's dashboard exit.
+        self.home_until = monotonic() + self.config.get("app_grace_seconds", 600)
+        self.returned_to_launcher = False
+        self.awaiting_dashboard = False
+        self.last_error = None
+        self.cancel_timer()
+        self.evaluate()
+        try:
+            async with self.dispatch_lock:
+                await self.hass.services.async_call("remote", "send_command", {
+                    "entity_id": remote, "command": "HOME",
+                }, blocking=True, context=context)
+        except Exception as exc:
+            self.last_error = str(exc)
+            raise
+        finally:
+            self.evaluate()
 
     async def stop(self):
         self.closed = True

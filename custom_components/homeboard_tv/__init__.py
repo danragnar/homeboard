@@ -18,9 +18,12 @@ async def async_setup(hass: HomeAssistant, config):
             raise ServiceValidationError("Homeboard TV entry not loaded; check entry_id")
         if call.service == "launch_app":
             await controller.launch(call.data["activity"], call.context)
+        elif call.service == "return_home":
+            await controller.return_home(call.context)
         else:
             # Explicit requests clear grace, but still respect playback/idle safety.
             controller.suspended_until = 0
+            controller.home_until = 0
             if controller.busy:
                 raise ServiceValidationError("A dashboard dispatch is already in progress")
             if controller.reason != "ready":
@@ -28,6 +31,7 @@ async def async_setup(hass: HomeAssistant, config):
             await controller.cast(call.context, raise_errors=True)
     base = {vol.Required("entry_id"): cv.string}
     hass.services.async_register(DOMAIN, "show_dashboard", handle, schema=vol.Schema(base))
+    hass.services.async_register(DOMAIN, "return_home", handle, schema=vol.Schema(base))
     hass.services.async_register(DOMAIN, "launch_app", handle, schema=vol.Schema({**base, vol.Required("activity"): vol.All(cv.string, vol.Length(min=1))}))
     return True
 

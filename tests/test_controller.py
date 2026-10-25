@@ -189,6 +189,66 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.controller.awaiting_dashboard)
         self.assertEqual(len(self.hass.services.calls),1)
 
+    async def test_return_home_sends_home_and_cancels_pending_cast_and_retry(self):
+        self.controller.evaluate()
+        timer=self.hass.timers[-1]
+        self.controller.awaiting_dashboard=True
+        context=object()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            await self.controller.return_home(context)
+        self.assertTrue(timer.cancelled)
+        self.assertFalse(self.controller.awaiting_dashboard)
+        self.assertEqual(self.controller.reason,'dashboard exit pause')
+        self.assertGreater(self.hass.timers[-1].delay,598)
+        self.assertEqual(self.hass.services.calls[0][0],('remote','send_command',{'entity_id':'remote.tv','command':'HOME'}))
+        self.assertIs(self.hass.services.calls[0][1]['context'],context)
+        self.assertTrue(self.controller.enabled)
+        await self.controller.cast()
+        self.assertEqual(len(self.hass.services.calls),1)
+
+    async def test_return_home_checks_remote_before_pausing_or_sending(self):
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            for value in [None,'off','unavailable']:
+                self.states['remote.tv']=SimpleNamespace(state=value,attributes={}) if value else None
+                with self.assertRaises(ValueError):
+                    await self.controller.return_home()
+            self.controller.config.pop('remote_entity')
+            with self.assertRaises(ValueError):
+                await self.controller.return_home()
+        self.assertEqual(self.controller.home_until,0)
+        self.assertEqual(self.hass.services.calls,[])
+
+    async def test_return_home_failure_reports_error_and_keeps_bounded_exit_pause(self):
+        self.hass.services.fail=True
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            with self.assertRaises(RuntimeError):
+                await self.controller.return_home()
+        self.assertEqual(self.controller.last_error,'Receiver unavailable')
+        self.assertEqual(self.controller.reason,'dashboard exit pause')
+        self.assertGreater(self.hass.timers[-1].delay,598)
+
+    async def test_return_home_serializes_after_inflight_dashboard_dispatch(self):
+        await self.controller.dispatch_lock.acquire()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            task=asyncio.create_task(self.controller.return_home())
+            await asyncio.sleep(0)
+            self.assertEqual(self.hass.services.calls,[])
+            self.assertEqual(self.controller.reason,'dashboard exit pause')
+            self.controller.dispatch_lock.release()
+            await task
+        self.assertEqual([call[0][:2] for call in self.hass.services.calls],[('remote','send_command')])
+
+    async def test_return_home_expiry_starts_a_fresh_stable_idle_delay(self):
+        self.controller.config['app_grace_seconds']=75
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}), patch.object(controller_module,'monotonic',return_value=1000):
+            await self.controller.return_home()
+            self.assertEqual(self.hass.timers[-1].delay,75)
+        with patch.object(controller_module,'monotonic',return_value=1075):
+            self.hass.timers[-1].callback(None)
+            self.assertEqual(self.controller.reason,'ready')
+            self.assertEqual(self.hass.timers[-1].delay,45)
+            self.assertEqual(len(self.hass.services.calls),1)
+
 class BrowserControllerTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         ControllerTests.setUp(self)
@@ -197,6 +257,21 @@ class BrowserControllerTests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         await self.controller.stop()
+
+    async def test_explicit_home_pause_survives_browser_to_launcher_and_other_apps(self):
+        self.states['remote.tv'].attributes={'current_activity':'com.phlox.tvwebbrowser'}
+        self.controller.evaluate()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            await self.controller.return_home()
+        until=self.controller.home_until
+        for foreground in ['launcher','netflix','launcher']:
+            self.states['remote.tv'].attributes={'current_activity':foreground}
+            self.controller.evaluate()
+            self.assertEqual(self.controller.home_until,until)
+            self.assertEqual(self.controller.reason,'dashboard exit pause')
+            self.assertGreater(self.hass.timers[-1].delay,598)
+        await self.controller.cast()
+        self.assertEqual(len(self.hass.services.calls),1)
 
     async def test_browser_launch_uses_remote_url_and_no_cast_retry(self):
         self.states['media_player.cast'].state='off'

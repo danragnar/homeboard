@@ -56,3 +56,33 @@ test('Demo links never navigate; local HA paths use HA routing and remote URLs l
  card.openMusicURL('/music-assistant');assert.equal(paths[0][2],'/music-assistant');assert.equal(events[0].type,'location-changed');
  card.openMusicURL('https://music.example/#/home');assert.deepEqual(assigned,['https://music.example/#/home']);
 });
+
+test('Native now playing needs only an entity; metadata is escaped and idle states clear stale tracks',async()=>{
+ const {card}=fixture();card._config.music_assistant={player_entity:'media_player.ma_living_room'};card._config.tvs=[];
+ const p=card._hass.states['media_player.ma_living_room'];p.state='playing';p.attributes={supported_features:16385,media_title:'<b>Track</b>',media_artist:'Artist & band',media_album_name:'Album',entity_picture:'javascript:alert(1)'};
+ const html=card.musicPanel();assert.match(html,/&lt;b&gt;Track/);assert.match(html,/Artist &amp; band/);assert.match(html,/Album/);assert.doesNotMatch(html,/<img|data-action="music-(?:open|playlist|tv)"|iframe/);assert.match(html,/aria-label="Pause"/);
+ p.state='idle';assert.match(card.musicPanel(),/Nothing playing/);assert.doesNotMatch(card.musicPanel(),/Artist &amp; band|&lt;b&gt;Track/);
+ p.state='unavailable';assert.match(card.musicPanel(),/Player unavailable/);assert.doesNotMatch(card.musicPanel(),/data-action="music-control"/);
+});
+test('Transport controls use standard HA services on the configured Music Assistant entity',async()=>{
+ const {card,calls}=fixture();const player=card._hass.states['media_player.ma_living_room'];
+ player.state='playing';player.attributes={supported_features:17469,volume_level:.5,is_volume_muted:false};
+ await click(card,'music-control','toggle');assert.equal(calls.at(-1)[1],'media_pause');
+ player.state='paused';await click(card,'music-control','toggle');assert.equal(calls.at(-1)[1],'media_play');
+ await click(card,'music-control','next');assert.equal(calls.at(-1)[1],'media_next_track');
+ await click(card,'music-control','previous');assert.equal(calls.at(-1)[1],'media_previous_track');
+ await click(card,'music-control','louder');assert.equal(calls.at(-1)[1],'volume_up');
+ await click(card,'music-control','quieter');assert.equal(calls.at(-1)[1],'volume_down');
+ await click(card,'music-control','mute');assert.deepEqual(calls.at(-1),['media_player','volume_mute',{entity_id:'media_player.ma_living_room',is_volume_muted:true}]);
+ assert.ok(calls.every(([domain,,data])=>domain==='media_player' && data.entity_id==='media_player.ma_living_room'));
+ player.attributes.supported_features=0;const count=calls.length;await click(card,'music-control','next');assert.equal(calls.length,count);assert.match(card._notice,/unavailable/);
+});
+test('Volume fallback respects capabilities and clamps levels; external state changes refresh now playing',async()=>{
+ const {musicCommand}=await import('../custom_components/homeboard_tv/frontend/model.mjs');
+ assert.deepEqual(musicCommand({state:'playing',attributes:{supported_features:4,volume_level:.99}},'louder'),{service:'volume_set',data:{volume_level:1}});
+ assert.deepEqual(musicCommand({state:'playing',attributes:{supported_features:4,volume_level:.01}},'quieter'),{service:'volume_set',data:{volume_level:0}});
+ assert.equal(musicCommand({state:'playing',attributes:{supported_features:4}},'louder'),null);
+ const {card,calls}=fixture();let renders=0;card.render=()=>renders++;
+ card.hass={...card._hass,states:{...card._hass.states,'media_player.ma_living_room':{state:'playing',attributes:{media_title:'Changed elsewhere'}}}};
+ assert.equal(renders,1);assert.match(card.musicPanel(),/Changed elsewhere/);assert.equal(calls.length,0);
+});

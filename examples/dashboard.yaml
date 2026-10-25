@@ -76,9 +76,10 @@ views:
                 # Enable only if this entry has a Google/Android TV remote.
                 launch_apps: false
             # Optional. Omit this section to hide the music box.
-            # Replace with your real URL/sidebar path, MA player and playlist URIs.
+            # Select the MA player in the visual editor, or set its entity here.
+            # No URL is needed for the embedded player or playlist playback.
             music_assistant:
-              url: https://music.example/#/home?player=Livingroom
+              # url: https://music.example/#/home?player=Livingroom
               player_entity: media_player.music_assistant_living_room
               playlists:
                 - name: Evening favourites

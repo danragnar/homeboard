@@ -96,6 +96,34 @@ export function musicURL(value, absolute = false) {
     return ['http:','https:'].includes(url.protocol) && Boolean(url.hostname) && !url.username && !url.password;
   } catch { return false; }
 }
+// HA MediaPlayerEntityFeature values; controls follow each player's capabilities.
+export function musicCommand(player, control) {
+  if (!player || ['unknown','unavailable'].includes(player.state)) return null;
+  const a = player.attributes || {}, features = Number(a.supported_features) || 0;
+  const has = bit => Boolean(features & bit);
+  if (control === 'toggle') {
+    const pause = ['playing','buffering'].includes(player.state);
+    return has(pause ? 1 : 16384) ? {service:pause?'media_pause':'media_play',data:{}} : null;
+  }
+  if (control === 'previous' || control === 'next') return has(control === 'previous'?16:32) ? {service:control === 'previous'?'media_previous_track':'media_next_track',data:{}} : null;
+  if (control === 'mute') return has(8) && typeof a.is_volume_muted === 'boolean' ? {service:'volume_mute',data:{is_volume_muted:!a.is_volume_muted}} : null;
+  if (control === 'quieter' || control === 'louder') {
+    if (has(1024)) return {service:control === 'louder'?'volume_up':'volume_down',data:{}};
+    const volume = finite(a.volume_level);
+    if (has(4) && volume !== null) return {service:'volume_set',data:{volume_level:Math.max(0,Math.min(1,volume+(control === 'louder'?.05:-.05)))}};
+  }
+  return null;
+}
+export function musicNowPlaying(player) {
+  const available = Boolean(player && !['unknown','unavailable'].includes(player.state));
+  const active = available && ['playing','paused','buffering'].includes(player.state);
+  const a = player?.attributes || {};
+  return {available, active, status:!available?'Unavailable':({playing:'Playing',paused:'Paused',buffering:'Buffering'})[player.state] || 'Idle',
+    title:!available?'Player unavailable':active?String(a.media_title || 'Track information unavailable'):'Nothing playing',
+    artist:active?String(a.media_artist || ''):'',album:active?String(a.media_album_name || ''):'',
+    artwork:active && musicURL(a.entity_picture)?a.entity_picture:'',
+    volume:available && finite(a.volume_level)!==null?Math.round(Math.max(0,Math.min(1,Number(a.volume_level)))*100):null};
+}
 export function validateMusic(config) {
   const music = config.music_assistant;
   if (music !== undefined && music !== null) {

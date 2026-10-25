@@ -29,7 +29,7 @@ Once the repository is published:
 If you manage **resources** in YAML, add the resource below to your existing `lovelace.resources` list instead. Homeboard logs a reminder and leaves YAML resource configuration under your control:
 
 ```yaml
-- url: /homeboard_tv/0.5.0/homeboard-tv-card.js
+- url: /homeboard_tv/0.6.0/homeboard-tv-card.js
   type: module
 ```
 
@@ -63,19 +63,29 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.5.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.6.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.5.0.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.6.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
-## Music Assistant shortcuts
+## Music Assistant player and shortcuts
 
-The optional music box has separate **Play** and **Open** actions for each saved playlist, **Open Music Assistant** for the full interface, and an optional **Open on TV** button. Add this in the card editor's advanced JSON (as a `music_assistant` object) or in Lovelace YAML:
+Choose a **Music Assistant player** in the card's visual editor. The picker lists players provided by Home Assistant's Music Assistant integration; Homeboard uses the existing authenticated HA connection. No Music Assistant server URL, separate login or token is required for the embedded player or playlist playback. An entity alone is enough:
 
 ```yaml
 music_assistant:
-  url: https://music.example/#/home?player=Livingroom
+  player_entity: media_player.music_assistant_living_room
+```
+
+The embedded player shows album artwork, track, artist, album and playing/paused/buffering status from that entity. Previous, play/pause, next, volume and mute controls appear when supported by the player. Changes made in Music Assistant, on a phone or elsewhere in HA update the dashboard. Idle and unavailable players clear stale track information. Opening the dashboard sends no playback or volume commands. Audio plays on the selected Music Assistant player; this is a dashboard control/display, not a second audio stream in the browser.
+
+The optional music box also has separate **Play** and **Open** actions for each saved playlist, **Open Music Assistant** for the full interface, and an optional **Open on TV** button. Add this in the card editor's advanced JSON (as a `music_assistant` object) or in Lovelace YAML:
+
+```yaml
+music_assistant:
+  # Optional shortcut to the full interface; unnecessary for playback/now playing.
+  # url: https://music.example/#/home?player=Livingroom
   player_entity: media_player.music_assistant_living_room
   playlists:
     - name: Evening favourites
@@ -91,6 +101,8 @@ Replace every example destination. Install the [Music Assistant HA integration](
 Open navigates **the browser displaying the card**. For Music Assistant installed as a Home Assistant app, `url` can instead be your actual sidebar path starting with `/`; Homeboard navigates within HA, whose sidebar loads the authenticated interface. Copy the actual sidebar path from your installation rather than using a temporary `/api/hassio_ingress/...` session URL. An absolute Music Assistant URL opens its web interface in the same browser and needs its own working login. Playlist links only navigate; they do not auto-play. Copy their exact URLs from Music Assistant. [Music Assistant documents URLs](https://www.music-assistant.io/faq/how-to/) for selecting a player, opening playlists, and showing Now Playing, for example `https://music.example/#/home?player=Livingroom&showFullscreenPlayer=true`. Omit `music_assistant` or set it to `null` to hide the box.
 
 To offer **Open on TV**, add `music_assistant_url: https://music.example/#/home?player=Livingroom` to the relevant existing `tvs` item. It must be a full HTTP(S) URL. The button uses that TV entry's existing `homeboard_tv.launch_app` action, Android TV remote and app-launch grace period; `launch_apps: false` hides it. A compatible browser such as TV Bro must be installed, handle the link, and already be signed in. Link routing and Music Assistant's own remote-control usability need testing on the device. For LG without an Android TV remote, use your existing webOS browser script separately.
+
+**Keeping the dashboard visible while music plays.** The embedded player stays inside Homeboard and does not navigate away. Use a separate speaker/player, or leave Homeboard open in a TV browser while music plays on a player that does not displace that browser. A browser dashboard can display and control any configured Music Assistant player, but does not itself become a Music Assistant audio player. Native audio playback on that same TV can still bring another app to the foreground, depending on the TV.
 
 **Cast and browser displays differ.** [Music Assistant's Google Cast provider](https://www.music-assistant.io/player-support/google-cast/) can play to the TV/Cast player using its Music Assistant Cast receiver and metadata display. That receiver is not the full interactive Music Assistant browser interface. [Home Assistant Cast](https://cast.home-assistant.io/faq.html) displays Lovelace views; this feature does not cast arbitrary Music Assistant web pages or embed its authenticated UI into the receiver. Use Homeboard on a phone/computer to trigger playlist playback, or use a TV browser for the full Music Assistant UI. Playing on the same Cast receiver replaces the dashboard's Cast session. Playing to a separate speaker can leave the TV dashboard visible.
 
@@ -143,6 +155,14 @@ Choose the appropriate transport per screen:
 For script transport, configure `dashboard_script` and an `idle_guard` binary sensor. **`on` alone is not proof that LG is idle.** The example allows only source names you have verified to mean the home screen; replace the example `Home` source with values observed in your LG entity. If your model does not expose a trustworthy idle signal, automatic takeover cannot be determined safely; use an external receiver or keep the auto-dashboard switch off and invoke your opening script manually.
 
 The LG browser needs its own authenticated HA session. Sign in on the TV using an appropriate HA account. Browser engine, cookies, HTTPS support, and modern JavaScript vary with webOS versions. Opening a URL successfully does not establish that HA rendered or logged in. The native integration does not make every LG model a Chromecast. See [webOS commands](https://www.home-assistant.io/actions/webostv.command/).
+
+## Return to Google TV Home
+
+The **Google TV Home** button beside the streaming-app shortcuts sends `HOME` through the selected TV entry's configured Android TV remote. It works with Browser and Cast dashboard transports. It does not use a launcher package ID or send a power command. The button is disabled when no TV is selected or the card TV entry has `launch_apps: false`; the integration validates that its remote is configured and online before sending the command. On a Cast dashboard, use the phone/computer dashboard controls if the receiver does not accept pointer/remote interaction.
+
+Exiting also pauses automatic dashboard reopening for that entry's `app_grace_seconds` (10 minutes by default). Returning to the launcher does not cancel this explicit exit pause. Afterwards, normal power, playback, foreground, cooldown and stable-idle checks apply. **Show dashboard** clears the pause early and still requires a safely idle screen. Turn **Auto dashboard** off if you want to keep automatic reopening disabled until you turn it on again. The temporary exit pause is in memory and resets if the integration restarts; the Auto dashboard switch persists across restarts.
+
+The same action is available as `homeboard_tv.return_home` with the screen's `entry_id`. The auto-dashboard switch exposes `exit_remaining_seconds` and status `dashboard exit pause`. A successful action confirms command dispatch, not which screen the TV actually rendered. The standalone preview only simulates this action and does not navigate or control a TV.
 
 ## Idle behavior
 
@@ -251,7 +271,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.5.0.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.6.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

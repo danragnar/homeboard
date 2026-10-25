@@ -30,6 +30,7 @@ class AutoCastSwitch(SwitchEntity, RestoreEntity):
                 "connection_retries": self.controller.connection_retries,
                 "foreground_app": activity.attributes.get(self.controller.config.get("activity_attribute", "current_activity")) if activity else None,
                 "playback_state": playback.state if playback else None,
+                "exit_remaining_seconds": max(0, ceil(self.controller.home_until - now)),
                 "grace_remaining_seconds": max(0, ceil(self.controller.suspended_until - now)),
                 "cooldown_remaining_seconds": max(0, ceil(self.controller.last_attempt + self.controller.config.get("cooldown_seconds", 300) - now)) if self.controller.last_attempt != float("-inf") else 0,
                 **{key: self.controller.config.get(key) for key in ("mode", "playback_entity", "power_entity", "activity_entity", "browser_app")}}
