@@ -27,7 +27,7 @@ const states={
  'switch.living_room_auto_dashboard':state('on',{status:'dashboard visible'}),
  'switch.lg_auto_dashboard':state('off',{status:'disabled'}),
 };
-const config={...DEFAULT_CONFIG,music_assistant:{player_entity:'media_player.demo_music',playlists:[{name:'Evening favourites',media_id:'library://playlist/demo-evening'},{name:'Weekend mornings',media_id:'library://playlist/demo-weekend'},{name:'Dinner together',media_id:'library://playlist/demo-dinner'}]},edge_to_edge:true,home_name:'Our home',weather_location:'Stockholm',
+const config={...DEFAULT_CONFIG,music_assistant:{player_entity:'media_player.demo_music',playlists:[{name:'Evening favourites',image:'/preview/sample-album.svg',media_id:'library://playlist/demo-evening'},{name:'Weekend mornings',media_id:'library://playlist/demo-weekend'},{name:'Dinner together',media_id:'library://playlist/demo-dinner'}]},edge_to_edge:true,home_name:'Our home',weather_location:'Stockholm',
  price_entity:'sensor.electricity_price',power_entity:'sensor.home_power',calendar_entity:'calendar.family',
  home_sensor_entities:['sensor.indoor_humidity','binary_sensor.kitchen_window'],temperature_entities:['sensor.living_temperature','sensor.kitchen_temperature','sensor.bedroom_temperature','sensor.office_temperature'],weather_entity:'weather.home',lock_entities:['lock.front_door','lock.back_door'],
  scenes:[{entity:'scene.evening',name:'Evening',icon:'sun',active_entity:'binary_sensor.evening_active'},{entity:'scene.movie',name:'Movie night',icon:'tv'},{entity:'scene.bright',name:'Bright & focused',icon:'bolt'},{entity:'scene.goodnight',name:'Good night',icon:'moon'}],

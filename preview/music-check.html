@@ -69,6 +69,29 @@ try {
  card.setConfig({...config,tvs:[]});
  assert(root.querySelector('[data-action="home"]').disabled,'Home must be disabled without target TV');
  passed.push('PASS · Home disabled without a supported target TV');
+ // Exercise library loading with a mocked HA connection; never contact a real player.
+ card.setConfig({...config,music_assistant:{player_entity:'media_player.demo_music',max_playlists:1}});
+ const demoHass=card._hass;card.demoMode=false;
+ const requests=[];
+ card._hass={...demoHass,callWS:async message=>{
+  requests.push(message);
+  if(message.type==='config/entity_registry/get') return {config_entry_id:'sample-ma'};
+  return {response:{items:[{name:'Favorite evening',uri:'library://playlist/favorite',image:'/preview/sample-album.svg'},{name:'Favorite morning',uri:'library://playlist/morning'}]}};
+ }};
+ await card.refreshMusicFavorites(true);
+ assert(requests[1].service_data.favorite===true,'Favorites filter missing');
+ assert(root.querySelectorAll('.music-playlist').length===1,'Favorite limit not applied');
+ assert(root.querySelector('.music-name').textContent==='Favorite evening','Favorite name missing');
+ assert(root.querySelector('.playlist-art img'),'Favorite artwork missing');
+ assert(root.querySelector('.playlist-art img').getAttribute('src')==='/preview/sample-album.svg','Favorite image URL missing');
+ assert(root.querySelector('.music-favorites-status').textContent.includes('2 favorite playlists'),'Favorite count missing');
+ card.setConfig({...card._config,music_assistant:{...card._config.music_assistant,max_playlists:0}});
+ assert(root.querySelectorAll('.music-playlist').length===2,'Show all favorites failed');
+ assert(root.querySelectorAll('.playlist-art').length===2,'Fallback music icon missing');
+ assert(picker.schema.some(field=>field.name==='show_favorites'),'Favorites toggle missing');
+ assert(picker.schema.some(field=>field.name==='max_playlists'),'Favorites limit editor missing');
+ card.demoMode=true;card._hass=demoHass;
+ passed.push('PASS · fetched favorite names, artwork, fallback icons, display limit and editor options');
  card.setConfig({...config,music_assistant:null});assert(!root.querySelector('.music'),'Optional box not hidden');
  passed.push('PASS · optional music box hides without configuration');
  result.textContent=passed.join('\n')+'\nAll checks passed. Sample data only.';

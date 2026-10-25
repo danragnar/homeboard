@@ -82,6 +82,8 @@ views:
             music_assistant:
               # url: https://music.example/#/home?player=Livingroom
               player_entity: media_player.music_assistant_living_room
+              show_favorites: true
+              max_playlists: 6 # 0 shows all favorites
               playlists:
                 - name: Evening favourites
                   media_id: library://playlist/REPLACE_WITH_PLAYLIST_ID

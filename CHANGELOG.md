@@ -1,5 +1,9 @@
 # Changes
 
+## 0.8.0
+
+- Load Music Assistant favorite playlists automatically with names, artwork, playback, refresh, and a configurable display limit (0 shows all).
+
 ## 0.7.0
 
 - Combine indoor temperatures and locks into Home sensors, with automatic type detection, unit-aware readings, binary sensor statuses, and a unified entity picker. Existing selections carry over.

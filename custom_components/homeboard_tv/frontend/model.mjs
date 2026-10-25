@@ -163,10 +163,14 @@ export function validateMusic(config) {
     if (typeof music !== 'object' || Array.isArray(music)) throw new Error('music_assistant must be an object');
     if (music.url && !musicURL(music.url)) throw new Error('music_assistant.url must be an HTTP(S) URL or Home Assistant path');
     if (music.player_entity && (typeof music.player_entity !== 'string' || !/^media_player\.[a-z0-9_]+$/.test(music.player_entity))) throw new Error('music_assistant.player_entity must be a media_player entity ID');
+    if (music.show_favorites !== undefined && typeof music.show_favorites !== 'boolean') throw new Error('music_assistant.show_favorites must be a boolean');
+    if (music.max_playlists !== undefined && (!Number.isInteger(music.max_playlists) || music.max_playlists < 0 || music.max_playlists > 100)) throw new Error('music_assistant.max_playlists must be an integer from 0 to 100 (0 shows all)');
+    if (music.config_entry_id !== undefined && (typeof music.config_entry_id !== 'string' || !music.config_entry_id.trim())) throw new Error('music_assistant.config_entry_id must be a nonempty string');
     if (music.playlists !== undefined && !Array.isArray(music.playlists)) throw new Error('music_assistant.playlists must be a list');
     for (const item of music.playlists || []) {
       if (!item || typeof item.name !== 'string' || !item.name.trim() || (!item.media_id && !item.url)) throw new Error('Each music playlist needs a name and media_id or url');
       if (item.media_id !== undefined && (typeof item.media_id !== 'string' || !item.media_id.trim())) throw new Error('Playlist media_id must be a nonempty string');
+      if (item.image && !musicURL(item.image)) throw new Error('Playlist image must be an HTTP(S) URL or Home Assistant path');
       if (item.url && !musicURL(item.url)) throw new Error('Playlist url must be an HTTP(S) URL or Home Assistant path');
     }
   }

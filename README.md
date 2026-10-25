@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.7.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.8.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.7.0.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.8.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -79,6 +79,17 @@ music_assistant:
 ```
 
 The embedded player shows album artwork, track, artist, album and playing/paused/buffering status from that entity. Previous, play/pause, next, volume and mute controls appear when supported by the player. Changes made in Music Assistant, on a phone or elsewhere in HA update the dashboard. Idle and unavailable players clear stale track information. Opening the dashboard sends no playback or volume commands. Audio plays on the selected Music Assistant player; this is a dashboard control/display, not a second audio stream in the browser.
+
+Favorite playlists load automatically from the selected player's Music Assistant integration using [`music_assistant.get_library`](https://www.home-assistant.io/actions/music_assistant.get_library/). Each shows its name, artwork (or a music icon when unavailable), and a **Play** button. Play starts that playlist on the selected player and replaces its queue. The visual editor offers **Show favorite playlists** and **Maximum favorite playlists** (default 6; 0 shows all). All favorites are fetched in pages, sorted by name, and refreshed every five minutes; **Refresh favorites** picks up changes immediately. Loading the dashboard only reads the library.
+
+```yaml
+music_assistant:
+  player_entity: media_player.music_assistant_living_room
+  show_favorites: true
+  max_playlists: 6  # 0 = all favorites
+```
+
+The integration instance is detected from the selected player's entity registry entry. If needed, set `music_assistant.config_entry_id` in advanced configuration to the Music Assistant integration entry ID. Favorite loading requires an HA Music Assistant integration that provides the `get_library` action. Errors appear beside the refresh button; playback controls and saved shortcuts remain available. Manually configured `playlists` stay visible in addition to the favorite limit and can include an optional `image` HTTP(S) URL or HA path.
 
 The optional music box also has separate **Play** and **Open** actions for each saved playlist, **Open Music Assistant** for the full interface, and an optional **Open on TV** button. Add this in the card editor's advanced JSON (as a `music_assistant` object) or in Lovelace YAML:
 
@@ -272,7 +283,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.7.0.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.8.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.
