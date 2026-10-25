@@ -1,53 +1,33 @@
-# Card fragment. Merge into your existing card configuration.
-# Configure this screen's app launch method in the Homeboard integration first.
-# All REPLACE values need formats verified for that app on your TV.
+# Card fragment. Configure each screen's app launch method in the integration.
+# No card platform setting or target type is needed for these shared shortcuts.
 tvs:
-  - name: Living room LG
-    entry_id: REPLACE_WITH_LG_ENTRY_ID
+  - name: Living room
+    entry_id: REPLACE_WITH_HOMEBOARD_ENTRY_ID
     auto_entity: switch.living_room_auto_dashboard
     launch_apps: true
-    # auto_entity exposes the integration's app launch method automatically.
-    # If you omit auto_entity, set app_launch_method: webostv here.
-    # Optional per-TV apps list replaces the shared apps below:
-    # apps:
-    #   - name: TV-specific sequence
-    #     target: {type: script, entity_id: script.play_living_room_episode}
+    # Optional: apps here replaces the global shortcut list for this TV.
+    # Use it when one TV needs a different launch_id override.
 apps:
   - name: Netflix
-    targets:
-      androidtv_remote:
-        type: activity
-        activity: netflix://
-      webostv:
-        type: source
-        # Must match the LG entity source_list exactly.
-        source: Netflix
-  - name: Open streaming app
-    targets:
-      androidtv_remote:
-        type: activity
-        activity: REPLACE_WITH_ANDROID_ACTIVITY
-      webostv:
-        type: app
-        app_id: REPLACE_WITH_WEBOS_APP_ID
-  - name: Favourite episode
-    targets:
-      androidtv_remote:
-        type: activity
-        activity: https://REPLACE_WITH_VERIFIED_ANDROID_EPISODE_LINK
-      webostv:
-        type: app
-        app_id: REPLACE_WITH_WEBOS_APP_ID
-        content_id: REPLACE_WITH_VERIFIED_CONTENT_ID
-        # Add only parameters accepted by this specific app:
-        # params: {contentTarget: REPLACE_WITH_VERIFIED_VALUE}
-  - name: Browser page
-    target:
-      type: url
-      url: https://REPLACE_WITH_MEDIA_PAGE_URL
-  - name: Custom media sequence
-    target:
-      type: script
-      entity_id: script.REPLACE_WITH_YOUR_SCRIPT
-      variables:
-        episode: REPLACE_WITH_SCRIPT_INPUT
+    app: netflix
+    color: '#e50914'
+  - name: SVT Play
+    app: svt_play
+    color: '#54cf87'
+  - name: TV4 Play
+    app: tv4_play
+    color: '#ed3a45'
+  - name: YouTube
+    app: youtube
+    color: '#ed3a45'
+  - name: Tänd brasa
+    app: svt_play
+    # Optional override; an HTTP(S) launch_id opens the browser on LG webOS.
+    launch_id: https://www.svtplay.se/video/KXvMGAZ/brasa/endast-sprakande-brasa?video=visa
+    color: '#e8743b'
+    icon: fire
+# A custom shortcut needs name and launch_id, with no app field:
+# - name: Custom
+#   launch_id: REPLACE_WITH_URL_OR_APP_ID_FOR_YOUR_TV
+#   icon: tv
+#   color: '#54cf87'

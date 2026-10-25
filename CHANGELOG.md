@@ -1,5 +1,10 @@
 # Changes
 
+## 0.12.0
+
+- Add shared app shortcuts with a generic launch_id override. The selected TV configuration decides how to launch; normal shortcuts need no platform-specific target objects.
+- Keep existing labels, icons, colours and layout, along with compatibility for older shortcut formats and per-TV overrides.
+
 ## 0.11.1
 
 - Add native LG source-name shortcuts so existing app names can launch through media_player.select_source without discovering app IDs. Validate source names and TV availability before starting app grace.

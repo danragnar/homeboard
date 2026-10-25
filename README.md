@@ -2,7 +2,7 @@
 
 A local Home Assistant dashboard with automatic TV browser launching or casting. Homeboard turns an idle screen into a home overview, then stays out of the way when you open another app.
 
-The dashboard includes today's electricity prices with high/low intervals, live power consumption in the electricity card, upcoming calendar events, mean indoor temperature, weather forecast, door lock status, scenes, and configurable Netflix / SVT Play / TV4 Play shortcuts. Every entity, app activity, TV destination, and price mapping is configurable.
+The dashboard includes today's electricity prices with high/low intervals, live power consumption in the electricity card, upcoming calendar events, mean indoor temperature, weather forecast, door lock status, scenes, and configurable Netflix / SVT Play / TV4 Play shortcuts. Every entity, app shortcut, TV destination, and price mapping is configurable.
 
 **Status:** initial implementation. JavaScript/data tests and isolated Python policy/controller tests run without Home Assistant. The preview uses explicitly labeled sample data. A real Home Assistant installation and physical TVs are still needed to verify pairing, actual playback reporting, Cast, LG browser compatibility, app links, and the configuration flow end to end.
 
@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.11.1`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.12.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.11.1.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.12.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -241,8 +241,8 @@ The visual card editor provides entity selectors for price, power, weather, and 
 | `theme` | `aurora` (default): blue and mint. `aurora-green`: sea green and mint. `aurora-teak`: sea green with teak and tulip accents. `nordic-green`: sea green, cream and ochre. `forest`: warm greens. `nordic`: muted vintage blues. `linen`: light day palette. `teak`: warm evening palette. |
 | `edge_to_edge` | `true` fills the viewport above HA navigation using the browser top layer and removes the outer card border in TV mode. Older browsers without top-layer support use fixed positioning, which may still be constrained by the host layout. Default `false`. Escape or **Exit full screen** returns to HA navigation; **Expand dashboard** re-enters. Disabled inside the HA card editor. |
 | `keyboard_navigation` | Arrow-key spatial navigation, default `true`; requires a browser/receiver that forwards key events. |
-| `tvs` | Objects with `name`, `entry_id`, optional `auto_entity`, `launch_apps`, `apps` (per-TV shortcut list) and `app_launch_method` (card fallback if no auto-dashboard switch is mapped). `launch_apps: false` disables app/Home controls. |
-| `apps` | Objects with `name`, `activity`, optional hexadecimal `color` and built-in `icon` (for example `fire`). Add/reorder freely. |
+| `tvs` | Objects with `name`, `entry_id`, optional `auto_entity`, `launch_apps`, `apps` (per-TV shortcut list) and legacy `app_launch_method` (only needed to resolve old platform-specific targets without a mapped switch). `launch_apps: false` disables app/Home controls. |
+| `apps` | Objects with `name`, `app` and optional `launch_id` override, hexadecimal `color` and built-in `icon` (for example `fire`). A custom shortcut can use `launch_id` without `app`. Add/reorder freely. |
 
 Scene icons supported: `sun`, `moon`, `tv`, `bolt`, `home`, `scene`, `temp`, `lock`, `shield`, `cloud`, `rain`, `cast`, `power`.
 
@@ -278,44 +278,47 @@ Events are fetched on connection, selection changes, calendar state changes and 
 
 HA scenes are snapshots, not on/off switches. Without an `active_entity`, Homeboard shows the scene's last activation time (or “Not tracked”). A helper can report whether actual lights/devices match the scene, in which case Homeboard can show “Active”. `examples/scene-tracking.yaml` shows one pattern; adapt it to the actual targets/brightness ranges defining your scene.
 
-Netflix starts with `netflix://`. SVT and TV4 start with their public HTTPS links. **Verify routing on your Google TV:** Android may open a browser or reject a link depending on the installed apps and their link associations. Set each `activity` to an app-supported deep link or the actual package ID shown by your remote's `current_activity`. Package-ID launching itself is unreliable on some Android TV versions; the activities are deliberately editable rather than assuming a universal package. See [Android TV Remote](https://www.home-assistant.io/integrations/androidtv_remote/).
+### App and media shortcuts
 
-### App and specific-media shortcuts
-
-In each screen's integration options, choose **App launch and Home control method**: **Android TV Remote** or **LG webOS**. Set its remote or LG TV entity. Dashboard browser launching remains independently configurable. For rooted webOS with a custom home screen, optionally enter its verified **LG home launcher app ID**.
-
-**Migrating existing LG shortcuts:** changing the screen's launch method does not convert the card's `activity` fields. Those fields are Android-only in the card, so existing shortcuts are disabled on webOS until you supply a native target. For ordinary app opening, replace `activity: Netflix` with `target: {type: source, source: Netflix}`. Use the exact, case-sensitive app name from the LG TV entity's `source_list` attribute. If an app is missing, enable it in the LG integration's Sources options. Use `target: {type: url, url: 'https://...'}` for an intentional browser page. The card shows a setup hint beside disabled shortcuts.
-
-In the card editor's advanced JSON or YAML, a shortcut can use `targets` keyed by `androidtv_remote` and `webostv`. A common `target` works for a shared browser URL or script. Existing `activity` values remain Android-only fallbacks. The card reads the app launch method from the TV's `auto_entity` switch; if you do not map that switch, set the card TV's `app_launch_method` to match the integration. The backend always validates against the integration's configured method. A shortcut without a compatible target is disabled, rather than guessing how an Android link should work on LG.
+Configure the TV once in **Settings → Devices & services → Homeboard TV → Configure**: choose **App launch and Home control method**, then select its Android TV remote or LG TV entity. The same card shortcut works on either platform. The backend uses the selected screen's saved configuration, so normal shortcuts do not need a card platform setting or platform-specific target objects.
 
 ```yaml
 apps:
-  - name: Favourite programme
-    targets:
-      androidtv_remote:
-        type: activity
-        activity: https://REPLACE_WITH_VERIFIED_ANDROID_DEEP_LINK
-      webostv:
-        type: app
-        app_id: REPLACE_WITH_VERIFIED_WEBOS_APP_ID
-        content_id: REPLACE_WITH_APP_SPECIFIC_CONTENT_ID
-        # Optional app-specific object; use keys supported by that app.
-        # params: {contentTarget: REPLACE_WITH_VERIFIED_VALUE}
+  - name: Netflix
+    app: netflix
+    color: '#e50914'
+  - name: SVT Play
+    app: svt_play
+    color: '#54cf87'
+  - name: TV4 Play
+    app: tv4_play
+    color: '#ed3a45'
+  - name: YouTube
+    app: youtube
+    color: '#ed3a45'
+  - name: Tänd brasa
+    app: svt_play
+    launch_id: https://www.svtplay.se/video/KXvMGAZ/brasa/endast-sprakande-brasa?video=visa
+    color: '#e8743b'
+    icon: fire
 ```
 
-| Target type | Fields | Behavior |
+`app` identifies a built-in app: `netflix`, `youtube`, `svt_play` or `tv4_play`. `name`, `icon` and `color` only control the button's appearance. Changing a label does not change its destination.
+
+`launch_id` is an optional override of the default launch URL/ID. Omit it to use the app's platform default. For a custom shortcut, supply `name` and `launch_id` without an `app`. The override is sent through the selected TV's configured launch method:
+
+| TV platform | Default app | `launch_id` override |
 | --- | --- | --- |
-| `activity` | `activity` | Android app link or package ID through the configured remote. |
-| `source` | `source` | Open an installed LG app by its exact `source_list` name using `media_player.select_source`. No app ID is required. |
-| `app` | `app_id`, optional `content_id` and `params` | LG `system.launcher/launch`; `content_id` becomes `contentId` and `params` is passed unchanged. Omit both optional fields to open just the app. |
-| `url` | `url` | Full credential-free HTTP(S) URL, opened through Android Remote or LG's browser according to the app launch method. |
-| `script` | `entity_id`, optional `variables` | Start an HA `script.*` entity with app grace applied. Use for provider-specific sequences. |
+| Android / Google TV | Open the app's configured default activity/link through Android TV Remote. | Send the exact URL, deep link or package ID as the remote's activity. |
+| LG webOS | Open the installed app through the native LG integration. App names are matched internally; no `source` configuration is needed in the card. | HTTP(S) URLs open in LG's browser. Other values must be installed webOS app IDs and launch through `webostv.command`. |
 
-To customize one television, put its entire shortcut list under that card `tvs` item's `apps`; it replaces the global list for that TV. `apps: []` hides its shortcuts. See [examples/app-shortcuts.yaml](examples/app-shortcuts.yaml) for media, browser and script examples.
+An override replaces the default; platform-specific app IDs are not converted into IDs for another platform. If different TVs need different overrides, put that TV's shortcut list under `tvs[].apps`. It replaces the global list for that TV. `apps: []` hides its shortcuts. See [examples/app-shortcuts.yaml](examples/app-shortcuts.yaml).
 
-A `content_id` is a provider-specific launch value, not necessarily a share URL or a raw movie ID. App-specific parameters, availability, account selection and autoplay must be verified on your TV. Root access does not make an app accept unsupported deep links. Homeboard reports that a launch was requested; it does not confirm that the correct media started playing. Find installed app IDs from your rooted TV with `luna-send -n 1 -f luna://com.webos.applicationManager/listApps '{}'`. Do not substitute an Android package ID or an LG source display name for the webOS app ID.
+For Android, URL routing depends on installed apps and link handlers. The shipped SVT/TV4 defaults are web links; test routing on your device and override `launch_id` where needed. For LG, if an app is missing, enable it in the LG integration's Sources options or override `launch_id` with its installed webOS app ID. Homeboard reports launch requests; it cannot confirm that specific media started playing. In particular, the fireplace example opens its URL in the LG browser, not inside native SVT Play. Native webOS media deep links need verified app-specific parameters.
 
-For a direct HA call, use `homeboard_tv.launch_app` with `entry_id` and a `target` object from the table. The legacy `activity` field still works for Android and HTTP(S) browser links on LG. Provide exactly one of `activity` or `target`.
+For a direct HA action, call `homeboard_tv.launch_app` with `entry_id`, `app` and optionally `launch_id`, or with `entry_id` and `launch_id` alone. App grace and launch serialization apply to all forms.
+
+**Compatibility:** existing `activity`, `target` and platform-keyed `targets` configurations remain supported. To migrate a normal shortcut, remove those old destination fields and set `app`, plus `launch_id` only if you want an override. The legacy advanced target form remains available for verified webOS `content_id`/`params` and HA script sequences. It is not required for ordinary app launching. The integration rejects ambiguous direct action requests that mix generic and legacy destination fields.
 
 Homeboard supports spatial navigation with arrow keys, a visible focus ring, and Enter/Space/Select activation in browsers that deliver keyboard events. Navigation runs before page-level handlers and prefers controls in the same row or column. The first remote key establishes focus on a scene/app; a subsequent OK/Select activates it. Held OK does not repeat actions. On the TV selector, up/down changes the selection and left/right moves to another control. Live updates patch existing controls instead of recreating them; unrelated entity changes do not redraw the card. Focus survives sensor refreshes and notices; select fields keep their native arrow-key behavior. This does not make the physical Google TV remote work in every receiver. A standard Google Cast receiver on a TV is primarily a display; a Google TV D-pad does not automatically become a pointer for an HA Cast custom card. Use the same dashboard on your phone/tablet to tap scenes and apps. A compatible TV browser supports keyboard/pointer interaction. Homeboard does not claim remote-navigation support inside the Cast receiver.
 
@@ -343,7 +346,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.11.1.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.12.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

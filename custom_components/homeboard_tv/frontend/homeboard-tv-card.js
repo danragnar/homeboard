@@ -507,13 +507,14 @@ export class HomeboardTVCard extends HTMLElement {
         if (!player || ['unknown','unavailable'].includes(player.state)) throw new Error('Music Assistant player unavailable');
         await this._hass.callService('music_assistant','play_media',{entity_id:music.player_entity,media_id:this.musicPlaylists()[index].media_id,media_type:'playlist',enqueue:'replace'});
       }
-      if(action==='music-tv') await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,activity:this.tv().music_assistant_url});
+      if(action==='music-tv') await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,launch_id:this.tv().music_assistant_url});
       if(action==='scene') await this._hass.callService('scene','turn_on',{entity_id:c.scenes[index].entity});
       if(action==='app') {
         if (!this.tv() || this.tv().launch_apps===false) throw new Error('App launching is disabled for this TV');
         const destination=this.appTarget(this.apps()[index]);
         if (!destination) throw new Error('Configure a shortcut target for this TV');
-        await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,target:destination});
+        const {type,...launch}=destination;
+        await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,...(type==='launch'?launch:{target:destination})});
       }
       if(action==='home') await this._hass.callService('homeboard_tv','return_home',{entry_id:this.tv().entry_id});
       if(action==='cast') await this._hass.callService('homeboard_tv','show_dashboard',{entry_id:this.tv().entry_id});
@@ -554,7 +555,7 @@ class HomeboardTVEditor extends HTMLElement {
   set hass(hass) { this._hass=hass; for (const form of this.shadowRoot.querySelectorAll('ha-form')) form.hass=hass; }
   render() {
     if(!this._config) return;
-    this.shadowRoot.innerHTML='<style>:host{display:block}p{line-height:1.6;color:var(--secondary-text-color)}textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:12px;border-radius:8px;font-family:monospace}button{padding:10px;margin-top:8px}.error{color:var(--error-color)}</style><ha-form></ha-form><p>Music Assistant: choose a player from the Home Assistant integration. Track information, controls and favorite playlists appear on the dashboard. Set maximum favorite playlists to 0 to show all. No URL is needed.</p><ha-form data-music-form></ha-form><p>Advanced configuration: optional Music Assistant interface links and playlists (music_assistant), scenes, TVs, app/media shortcuts, and custom price field mappings. Shortcuts accept activity (legacy Android), target, or targets keyed by androidtv_remote/webostv. Use tvs[].apps for per-TV overrides. Edit the JSON below, then apply.</p><textarea aria-label="Advanced card configuration"></textarea><button>Apply advanced configuration</button><p class="error" role="alert"></p>';
+    this.shadowRoot.innerHTML='<style>:host{display:block}p{line-height:1.6;color:var(--secondary-text-color)}textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:12px;border-radius:8px;font-family:monospace}button{padding:10px;margin-top:8px}.error{color:var(--error-color)}</style><ha-form></ha-form><p>Music Assistant: choose a player from the Home Assistant integration. Track information, controls and favorite playlists appear on the dashboard. Set maximum favorite playlists to 0 to show all. No URL is needed.</p><ha-form data-music-form></ha-form><p>Advanced configuration: optional Music Assistant interface links and playlists (music_assistant), scenes, TVs, app/media shortcuts, and custom price field mappings. Shortcuts use app (netflix, youtube, svt_play or tv4_play) and optional launch_id for a custom URL or app ID. The selected TV determines how to launch. Name, icon and color control the appearance. Use tvs[].apps for per-TV overrides. Edit the JSON below, then apply.</p><textarea aria-label="Advanced card configuration"></textarea><button>Apply advanced configuration</button><p class="error" role="alert"></p>';
     const form=this.shadowRoot.querySelector('ha-form');
     form.hass=this._hass; form.data={...this._config,home_sensor_entities:homeSensorIds(this._config)};
     form.schema=[

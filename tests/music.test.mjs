@@ -39,7 +39,7 @@ test('Links open the chosen view without starting playback or launching TV',asyn
 });
 test('Open on TV uses the configured entry and browser URL; disabled TVs hide it',async()=>{
  const {card,calls}=fixture();await click(card,'music-tv');
- assert.deepEqual(calls,[['homeboard_tv','launch_app',{entry_id:'tv-entry',activity:'https://music.example/#/home?player=Livingroom'}]]);
+ assert.deepEqual(calls,[['homeboard_tv','launch_app',{entry_id:'tv-entry',launch_id:'https://music.example/#/home?player=Livingroom'}]]);
  card._config.tvs[0].launch_apps=false;assert.doesNotMatch(card.musicPanel(),/data-action="music-tv"/);
 });
 test('Playlist names are escaped and link-only playlists work without a player',()=>{

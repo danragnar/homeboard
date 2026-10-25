@@ -5,7 +5,7 @@ from time import monotonic
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from .policy import OFFLINE, Snapshot, idle_reason, connection_retry_reason
-from .launch import launch_call
+from .launch import launch_call, match_app_source
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -255,17 +255,23 @@ class Controller:
             self.busy = False
             self.evaluate()  # A still-idle receiver can retry after the cooldown.
 
-    async def launch(self, activity=None, context=None, target=None):
+    async def launch(self, activity=None, context=None, target=None, *, app=None, launch_id=None):
         from homeassistant.exceptions import ServiceValidationError
         try:
-            domain, service, data = launch_call(self.config, activity, target)
+            domain, service, data = launch_call(self.config, activity, target, app=app, launch_id=launch_id)
         except ValueError as exc:
             raise ServiceValidationError(str(exc)) from exc
         if domain == "webostv" or (domain, service) == ("media_player", "select_source"):
             state = self.hass.states.get(data["entity_id"])
             if not state or state.state in OFFLINE:
                 raise ServiceValidationError("LG webOS TV unavailable; app command was not sent")
-            if service == "select_source" and data["source"] not in (state.attributes.get("source_list") or []):
+            sources = state.attributes.get("source_list") or []
+            if service == "select_source" and app is not None:
+                matched = match_app_source(data["source"], sources)
+                if not matched:
+                    raise ServiceValidationError("This app is not available on the selected TV. Enable it in the LG integration, or set launch_id to its installed webOS app ID")
+                data = {**data, "source": matched}
+            if service == "select_source" and data["source"] not in sources:
                 raise ServiceValidationError("Unknown LG source name. Copy the exact app name from this TV's source_list attribute; enable the source in the LG integration if it is missing.")
         self.returned_to_launcher = False
         self.suspended_until = monotonic() + self.config.get("app_grace_seconds", 600)

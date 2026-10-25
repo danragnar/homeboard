@@ -182,6 +182,9 @@ export function appLaunchMethod(tv, states = {}) {
   return states[tv?.auto_entity]?.attributes?.app_launch_method || tv?.app_launch_method || 'androidtv_remote';
 }
 export function shortcutTarget(app, method) {
+  if (app?.app!==undefined || app?.launch_id!==undefined) {
+    return {type:'launch',...(app.app!==undefined?{app:app.app}:{}),...(app.launch_id!==undefined?{launch_id:app.launch_id}:{})};
+  }
   const target = app?.targets?.[method] || app?.target || (method === 'androidtv_remote' && app?.activity ? {type:'activity',activity:app.activity} : null);
   if ((['app','source'].includes(target?.type) && method!=='webostv') || (target?.type==='activity' && method!=='androidtv_remote')) return null;
   return target;
@@ -193,8 +196,8 @@ export function shortcutSetupHint(tv, apps, states = {}) {
   const missing=apps.filter(app=>!shortcutTarget(app,method)).length;
   if (!missing) return '';
   return method==='webostv'
-    ? 'Add webOS targets to the disabled shortcuts: use a source target for an installed app, an app target for media deep links, or a URL target for a browser page. Existing activity fields are Android-only.'
-    : 'Add Android targets to the disabled shortcuts. If this is a webOS TV, check its app launch method and the auto-dashboard switch selected in this card.';
+    ? 'Choose an app for each disabled shortcut, or provide launch_id for a custom URL or app ID. Existing Android-only shortcuts need updating.'
+    : 'Choose an app for each disabled shortcut, or provide launch_id. Check this TV’s app launch method if an existing shortcut targets another platform.';
 }
 export function validateShortcuts(config) {
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -213,7 +216,10 @@ export function validateShortcuts(config) {
   function validateApps(apps) {
     if (!Array.isArray(apps)) throw new Error('TV apps must be a list');
     for (const app of apps) {
-      if (!app || !text(app.name) || (!app.activity && !app.target && !app.targets)) throw new Error('Each shortcut needs a name and activity, target or targets');
+      if (!app || !text(app.name) || (!app.app && !app.launch_id && !app.activity && !app.target && !app.targets)) throw new Error('Each shortcut needs a name and app or launch_id');
+      if (app.app!==undefined && !text(app.app)) throw new Error('Shortcut app must be a nonempty app name');
+      if (app.launch_id!==undefined && !text(app.launch_id)) throw new Error('launch_id must be a nonempty URL or app ID');
+      if (app.app!==undefined && app.launch_id===undefined && !['netflix','youtube','svtplay','tv4play'].includes(app.app.toLowerCase().replace(/[^a-z0-9]/g,''))) throw new Error('Unknown app: supply launch_id for a custom shortcut');
       if (app.activity!==undefined && !text(app.activity)) throw new Error('Shortcut activity must be a nonempty string');
       if (app.target!==undefined) validateTarget(app.target);
       if (app.targets!==undefined) {
@@ -237,9 +243,9 @@ export const DEFAULT_CONFIG = {
   price_entity:"", price_attribute:"raw_today", price_value_key:"value", price_start_key:"start", price_end_key:"end",
   price_factor:1, price_offset:0, power_entity:"", home_sensor_entities:[], temperature_entities:[], weather_entity:"", forecast_type:"daily",
   music_assistant:null, calendar_entity:"", calendar_days:7, calendar_max_events:3, lock_entities:[], scenes:[], tvs:[], apps:[
-    {name:"Netflix", activity:"netflix://", color:"#e50914"},
-    {name:"SVT Play", activity:"https://www.svtplay.se", color:"#54cf87"},
-    {name:"TV4 Play", activity:"https://www.tv4play.se", color:"#ed3a45"},
-    {name:"Tänd brasa", activity:"https://www.svtplay.se/video/KXvMGAZ/brasa/endast-sprakande-brasa?video=visa", color:"#e8743b", icon:"fire"}
+    {name:"Netflix", app:"netflix", color:"#e50914"},
+    {name:"SVT Play", app:"svt_play", color:"#54cf87"},
+    {name:"TV4 Play", app:"tv4_play", color:"#ed3a45"},
+    {name:"Tänd brasa", app:"svt_play", launch_id:"https://www.svtplay.se/video/KXvMGAZ/brasa/endast-sprakande-brasa?video=visa", color:"#e8743b", icon:"fire"}
   ]
 };

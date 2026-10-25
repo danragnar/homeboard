@@ -74,8 +74,8 @@ views:
               - name: Bedroom · LG TV
                 entry_id: REPLACE_WITH_LG_CONFIG_ENTRY_ID
                 auto_entity: switch.bedroom_auto_dashboard
-                # Enable after configuring LG webOS app launching and native shortcut targets.
-                launch_apps: false
+                # Enable after configuring LG webOS app launching.
+                launch_apps: true
             # Optional. Omit this section to hide the music box.
             # Select the MA player in the visual editor, or set its entity here.
             # No URL is needed for the embedded player or playlist playback.
@@ -91,17 +91,18 @@ views:
                   # url: https://music.example/REPLACE_WITH_PLAYLIST_PAGE
             apps:
               - name: Netflix
-                activity: netflix://
+                app: netflix
                 color: '#e50914'
               - name: SVT Play
-                # Verify link routing on your TV; override with a package ID if needed.
-                activity: https://www.svtplay.se
+                # The TV configuration chooses the platform; launch_id overrides its default.
+                app: svt_play
                 color: '#54cf87'
               - name: TV4 Play
-                activity: https://www.tv4play.se
+                app: tv4_play
                 color: '#ed3a45'
               - name: Tänd brasa
-                # Opens SVT Play's crackling fireplace video.
-                activity: https://www.svtplay.se/video/KXvMGAZ/brasa/endast-sprakande-brasa?video=visa
+                # Opens this URL through the selected TV; webOS uses its browser.
+                app: svt_play
+                launch_id: https://www.svtplay.se/video/KXvMGAZ/brasa/endast-sprakande-brasa?video=visa
                 color: '#e8743b'
                 icon: fire

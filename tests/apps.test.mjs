@@ -57,8 +57,33 @@ test('Native source shortcuts select the configured TV and preserve source names
 });
 test('Disabled shortcut hints distinguish unsupported Android activities from disabled app controls',()=>{
  const tv={app_launch_method:'webostv'},apps=[{name:'Netflix',activity:'Netflix'}];
- assert.match(shortcutSetupHint(tv,apps),/Existing activity fields are Android-only/);
+ assert.match(shortcutSetupHint(tv,apps),/Choose an app/);
  assert.match(shortcutSetupHint({...tv,launch_apps:false},apps),/launch_apps/);
  assert.equal(shortcutSetupHint(tv,[{name:'Netflix',target:{type:'source',source:'Netflix'}}]),'');
  assert.equal(shortcutSetupHint(null,apps),'');
+});
+test('One generic app shortcut sends the same request for either selected TV',async()=>{
+ const {card,calls}=fixture();card._config.apps=[{name:'Netflix',app:'netflix',icon:'tv',color:'#e50914'}];
+ validateShortcuts(card._config);
+ const visual={...card.apps()[0]};
+ await click(card);card._selectedTV=0;await click(card);
+ assert.deepEqual(calls,[['homeboard_tv','launch_app',{entry_id:'lg',app:'netflix'}],['homeboard_tv','launch_app',{entry_id:'android',app:'netflix'}]]);
+ assert.deepEqual(card.apps()[0],visual);
+});
+test('Generic launch_id overrides work with or without an app and preserve per-TV overrides',async()=>{
+ const {card,calls}=fixture();card._config.apps=[{name:'Video',app:'youtube',launch_id:'https://media.example/42'}];
+ await click(card);assert.deepEqual(calls[0][2],{entry_id:'lg',app:'youtube',launch_id:'https://media.example/42'});
+ card.tv().apps=[{name:'Custom',launch_id:'custom.webos.app',icon:'fire',color:'#e8743b'}];
+ await click(card);assert.deepEqual(calls[1][2],{entry_id:'lg',launch_id:'custom.webos.app'});
+ assert.equal(shortcutSetupHint(card.tv(),card.apps(),card._hass.states),'');
+ for(const app of [{name:'Bad',app:''},{name:'Bad',launch_id:''},{name:'Bad',app:'unknown'}]) assert.throws(()=>validateShortcuts({apps:[app]}));
+});
+test('Shipped shortcuts use the generic configuration with the same labels, colours and fireplace icon',()=>{
+ assert.deepEqual(DEFAULT_CONFIG.apps.map(({name,color,icon})=>({name,color,icon})),[
+  {name:'Netflix',color:'#e50914',icon:undefined},{name:'SVT Play',color:'#54cf87',icon:undefined},
+  {name:'TV4 Play',color:'#ed3a45',icon:undefined},{name:'Tänd brasa',color:'#e8743b',icon:'fire'}]);
+ for(const app of DEFAULT_CONFIG.apps) {
+  validateShortcuts({apps:[app]});
+  for(const method of ['androidtv_remote','webostv']) assert.equal(shortcutTarget(app,method).type,'launch');
+ }
 });

@@ -552,4 +552,33 @@ class WebOSControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.controller.suspended_until,0)
         self.assertEqual(self.hass.services.calls,[])
 
+    async def test_generic_app_routes_using_integration_method_and_installed_name(self):
+        self.controller.config['app_launch_method']='webostv'
+        self.states['media_player.lg'].attributes['source_list']=['SVTPlay']
+        context=object()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            await self.controller.launch(app='svt_play',context=context)
+        self.assertEqual(self.hass.services.calls[0][0],('media_player','select_source',{'entity_id':'media_player.lg','source':'SVTPlay'}))
+        self.assertIs(self.hass.services.calls[0][1]['context'],context)
+        self.assertEqual(self.controller.reason,'app grace period')
+
+    async def test_generic_app_override_bypasses_default_installed_name_lookup(self):
+        self.controller.config['app_launch_method']='webostv'
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            await self.controller.launch(app='netflix',launch_id='custom.netflix')
+        self.assertEqual(self.hass.services.calls[0][0],('webostv','command',{'entity_id':'media_player.lg','command':'system.launcher/launch','payload':{'id':'custom.netflix'}}))
+
+    async def test_missing_generic_app_does_not_start_grace_or_dispatch(self):
+        self.controller.config['app_launch_method']='webostv'
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            with self.assertRaises(ValueError):await self.controller.launch(app='youtube')
+        self.assertEqual(self.hass.services.calls,[])
+        self.assertEqual(self.controller.suspended_until,0)
+
+    async def test_generic_app_uses_android_when_that_is_the_saved_screen_method(self):
+        self.controller.config.update(app_launch_method='androidtv_remote',remote_entity='remote.tv')
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            await self.controller.launch(app='netflix')
+        self.assertEqual(self.hass.services.calls[0][0],('remote','turn_on',{'entity_id':'remote.tv','activity':'netflix://'}))
+
 if __name__=='__main__': unittest.main()

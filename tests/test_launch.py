@@ -74,4 +74,32 @@ class LaunchTests(unittest.TestCase):
         self.assertIn('app_launch_method',launch.config_errors({'app_launch_method':'wrong'}))
         self.assertIn('home_app',launch.config_errors({**self.webos,'home_app':' '}))
 
+    def test_shared_app_automatically_uses_selected_screens_platform(self):
+        for app in ['netflix','youtube','svt_play','tv4_play']:
+            name, android_id=launch.APPS[app]
+            self.assertEqual(launch.launch_call(self.android,app=app),('remote','turn_on',{'entity_id':'remote.tv','activity':android_id}))
+            self.assertEqual(launch.launch_call(self.webos,app=app),('media_player','select_source',{'entity_id':'media_player.lg','source':name}))
+        self.assertEqual(launch.launch_call(self.webos,app='SVT Play'),launch.launch_call(self.webos,app='svt_play'))
+
+    def test_launch_id_overrides_app_default_or_works_without_an_app(self):
+        for app in [None,'netflix','custom']:
+            self.assertEqual(launch.launch_call(self.android,app=app,launch_id='custom://episode/42'),('remote','turn_on',{'entity_id':'remote.tv','activity':'custom://episode/42'}))
+            self.assertEqual(launch.launch_call(self.webos,app=app,launch_id='custom.webos.app'),('webostv','command',{'entity_id':'media_player.lg','command':'system.launcher/launch','payload':{'id':'custom.webos.app'}}))
+            self.assertEqual(launch.launch_call(self.webos,app=app,launch_id='https://media.example/42'),('webostv','command',{'entity_id':'media_player.lg','command':'system.launcher/open','payload':{'target':'https://media.example/42'}}))
+
+    def test_generic_launch_rejects_invalid_or_ambiguous_configuration(self):
+        for config,args in [(self.webos,{'app':'unknown'}),(self.android,{'app':''}),
+                            (self.webos,{'app':'netflix','launch_id':''}),
+                            (self.webos,{'launch_id':'netflix://'}),
+                            (self.webos,{'launch_id':'https://user:pass@example.test'}),
+                            (self.android,{'app':'netflix','activity':'netflix://'}),
+                            (self.webos,{'launch_id':'netflix','target':{'type':'app','app_id':'netflix'}})]:
+            with self.subTest(args=args), self.assertRaises(ValueError):launch.launch_call(config,**args)
+
+    def test_default_webos_app_matches_available_names_without_user_source_configuration(self):
+        self.assertEqual(launch.match_app_source('SVT Play',['svtplay']),'svtplay')
+        self.assertEqual(launch.match_app_source('TV4 Play',['TV4Play']),'TV4Play')
+        self.assertIsNone(launch.match_app_source('SVT Play',['SVTPlay','svtplay']))
+        self.assertIsNone(launch.match_app_source('Netflix',['YouTube']))
+
 if __name__=='__main__':unittest.main()

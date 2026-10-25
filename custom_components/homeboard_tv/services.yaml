@@ -10,7 +10,7 @@ show_dashboard:
           integration: homeboard_tv
 launch_app:
   name: Launch app or media
-  description: Pause automatic dashboard opening, then launch an Android activity, webOS source/app/media, browser URL, or HA script. Provide exactly one of activity or target.
+  description: Open an app on the selected screen using its configured platform. Choose app and optionally override launch_id, or supply launch_id alone for a custom shortcut. Legacy activity and target calls remain supported.
   fields:
     entry_id:
       name: Screen configuration
@@ -18,13 +18,29 @@ launch_app:
       selector:
         config_entry:
           integration: homeboard_tv
+    app:
+      name: App
+      description: Built-in app name. The screen configuration selects Android TV Remote or LG webOS automatically.
+      example: netflix
+      selector:
+        select:
+          options:
+            - netflix
+            - youtube
+            - svt_play
+            - tv4_play
+    launch_id:
+      name: Launch URL or app ID override
+      description: Optional override. Android receives the value as its activity. LG opens HTTP(S) URLs in its browser and launches other values as webOS app IDs.
+      selector:
+        text:
     activity:
       name: Legacy Android activity or browser URL
       example: "netflix://"
       selector:
         text:
     target:
-      name: App or media target
+      name: Legacy advanced target
       description: "An object with type: activity, source, app, url, or script. Source targets need the exact source name from the LG TV source_list. webOS app fields: app_id, optional content_id and params. URL field: url. Script fields: entity_id and optional variables."
       selector:
         object:

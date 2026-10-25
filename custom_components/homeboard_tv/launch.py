@@ -4,6 +4,12 @@ import re
 from urllib.parse import urlsplit
 
 METHODS = {"androidtv_remote", "webostv"}
+APPS = {
+    "netflix": ("Netflix", "netflix://"),
+    "youtube": ("YouTube", "vnd.youtube://"),
+    "svt_play": ("SVT Play", "https://www.svtplay.se"),
+    "tv4_play": ("TV4 Play", "https://www.tv4play.se"),
+}
 
 
 def config_errors(data):
@@ -21,13 +27,16 @@ def _text(value):
     return isinstance(value, str) and bool(value.strip()) and value == value.strip()
 
 
-def launch_call(config, activity=None, target=None):
+def launch_call(config, activity=None, target=None, *, app=None, launch_id=None):
     """Return (domain, service, data); reject unsupported destinations explicitly."""
     method = config.get("app_launch_method", "androidtv_remote")
     if method not in METHODS:
         raise ValueError("Choose a supported app launch method in screen settings")
-    if (activity is None) == (target is None):
-        raise ValueError("Provide exactly one of activity or target")
+    generic = app is not None or launch_id is not None
+    if sum((activity is not None, target is not None, generic)) != 1:
+        raise ValueError("Provide app/launch_id, or one legacy activity or target")
+    if generic:
+        return _app_call(config, app, launch_id)
     if activity is not None:
         # Legacy callers remain Android activities; HTTP links also work on LG.
         if not _text(activity):
@@ -109,6 +118,39 @@ def launch_call(config, activity=None, target=None):
     if not entity:
         raise ValueError("Configure an LG webOS TV entity for this screen first")
     return "webostv", "command", {"entity_id": entity, "command": command, "payload": payload}
+
+
+def _app_call(config, app, launch_id):
+    """One shortcut interface; the screen configuration owns platform routing."""
+    if app is not None and not _text(app):
+        raise ValueError("App must be a nonempty app name")
+    key = re.sub(r"[^a-z0-9]", "", app.lower()) if app else None
+    preset = next((value for name, value in APPS.items() if name.replace("_", "") == key), None)
+    if launch_id is not None:
+        if not _text(launch_id):
+            raise ValueError("launch_id must be a nonempty URL or app ID")
+        if config.get("app_launch_method", "androidtv_remote") == "androidtv_remote":
+            return launch_call(config, target={"type": "activity", "activity": launch_id})
+        if launch_id.lower().startswith(("http:", "https:")):
+            return launch_call(config, target={"type": "url", "url": launch_id})
+        if not re.fullmatch(r"[A-Za-z0-9._-]+", launch_id):
+            raise ValueError("This webOS TV needs a webOS app ID or HTTP(S) URL in launch_id; Android URI schemes cannot be used on webOS")
+        return launch_call(config, target={"type": "app", "app_id": launch_id})
+    if not preset:
+        raise ValueError("Unknown app. Choose netflix, youtube, svt_play or tv4_play, or supply launch_id for a custom shortcut")
+    name, android = preset
+    if config.get("app_launch_method", "androidtv_remote") == "webostv":
+        return launch_call(config, target={"type": "source", "source": name})
+    return launch_call(config, target={"type": "activity", "activity": android})
+
+
+def match_app_source(name, sources):
+    """Match built-in apps to the installed TV names without requiring UI IDs."""
+    if name in sources:
+        return name
+    normalize = lambda value: re.sub(r"[^a-z0-9]", "", value.lower())
+    matches = [value for value in sources if isinstance(value, str) and normalize(value) == normalize(name)]
+    return matches[0] if len(matches) == 1 else None
 
 
 def _json_object(value):
