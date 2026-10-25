@@ -1,4 +1,4 @@
-import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, homeSensorIds, homeSensors, sceneStatus, zonedDate, calendarEvents, validateMusic, musicURL, musicNowPlaying, musicCommand} from './model.mjs';
+import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, homeSensorIds, homeSensors, sceneStatus, zonedDate, calendarEvents, validateMusic, musicURL, musicNowPlaying, musicCommand, appLaunchMethod, shortcutTarget, validateShortcuts} from './model.mjs';
 import {navigationKey, directionalTarget} from './navigation.mjs';
 import {patchHTML} from './dom.mjs';
 import {styles} from './styles.mjs';
@@ -79,7 +79,7 @@ export class HomeboardTVCard extends HTMLElement {
     if (!['°C','°F'].includes(next.temperature_unit)) throw new Error('temperature_unit must be °C or °F');
     for (const tv of next.tvs) if (!tv || !tv.name || !tv.entry_id) throw new Error('Each TV needs a name and entry_id');
     for (const scene of next.scenes) if (!scene || !scene.entity?.startsWith('scene.')) throw new Error('Each scene needs a scene.entity_id in entity');
-    for (const app of next.apps) if (!app || !app.name || !app.activity) throw new Error('Each app needs name and activity');
+    validateShortcuts(next);
     if (!['aurora','aurora-green','aurora-teak','nordic-green','forest','nordic','linen','teak'].includes(next.theme)) throw new Error('theme must be aurora, aurora-green, aurora-teak, nordic-green, forest, nordic, linen or teak');
     if (next.calendar_entity && (typeof next.calendar_entity !== 'string' || !/^calendar\.[a-z0-9_]+$/.test(next.calendar_entity))) throw new Error('calendar_entity must be a calendar entity ID');
     for (const [key,max] of [['calendar_days',31],['calendar_max_events',10]]) {
@@ -313,6 +313,8 @@ export class HomeboardTVCard extends HTMLElement {
   time(date, options = {}) { return date ? new Date(date).toLocaleTimeString(this._config.locale, {timeZone:this._config.time_zone,hour:'2-digit',minute:'2-digit',...options}) : '—'; }
   fmt(value,digits=1) { return number(value,digits,this._config.locale); }
   tv() { return this._config.tvs[this._selectedTV]; }
+  apps() { return this.tv()?.apps ?? this._config.apps; }
+  appTarget(app) { return shortcutTarget(app,appLaunchMethod(this.tv(),this._hass?.states)); }
   renderChart(rows, summary) {
     if (!rows.length) return '<div class="empty">Connect a price sensor with timestamped intervals.<br>Hourly and 15-minute prices are supported.</div>';
     const left=28, width=670, height=112, top=12;
@@ -472,7 +474,7 @@ export class HomeboardTVCard extends HTMLElement {
         <section class="card scenes"><div class="card-head"><span class="card-title">${icon('scene')} Set the mood</span><span class="reduced">SCENES</span></div><div class="scene-list">${c.scenes.length?c.scenes.map((scene,i)=>{const status=sceneStatus(states,scene,c);return `<button class="scene ${status==='Active'?'active':''}" data-action="scene" data-index="${i}" aria-disabled="${this._busy}"><span class="scene-top">${icon(scene.icon || 'scene',18)}${status==='Active'?'<i class="dot" style="color:var(--mint)"></i>':''}</span><span class="scene-name">${esc(scene.name || states[scene.entity]?.attributes?.friendly_name || scene.entity)}</span><span class="scene-status">${esc(status)}</span></button>`}).join(''):'<div class="empty">Add scenes and optional activity helpers.</div>'}</div></section>
       </main>
       ${this.musicPanel()}
-      <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app on your selected Google TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps"><button class="app tv-home" data-action="home" aria-label="Return ${esc(tv?.name || 'selected TV')} to Google TV Home" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}">${icon('home',18)} Google TV Home</button>${c.apps.map((app,i)=>`<button class="app" data-action="app" data-index="${i}" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}"><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${Object.hasOwn(paths,app.icon||"")?icon(app.icon,18):esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>
+      <section class="entertainment"><div><div class="entertainment-label">Something good to watch.<small>Open an app or media on your selected TV</small></div><div class="tv-control" style="margin-top:12px">${icon('tv',15)}<select data-tv aria-label="Target television" ${c.tvs.length?'':'disabled'}>${c.tvs.length?c.tvs.map((t,i)=>`<option value="${i}" ${this._selectedTV===i?'selected':''}>${esc(t.name)}</option>`).join(''):'<option>Add a TV in settings</option>'}</select></div></div><div class="apps"><button class="app tv-home" data-action="home" aria-label="Return ${esc(tv?.name || 'selected TV')} to TV Home" ${!tv || tv.launch_apps===false?'disabled':''} aria-disabled="${this._busy}">${icon('home',18)} TV Home</button>${this.apps().map((app,i)=>`<button class="app" data-action="app" data-index="${i}" title="${this.appTarget(app)?'':'Configure a shortcut target for this TV'}" ${!tv || tv.launch_apps===false || !this.appTarget(app)?'disabled':''} aria-disabled="${this._busy}"><span class="app-mark" style="color:${/^#[0-9a-f]{3,8}$/i.test(app.color||'')?app.color:'#c7e7a5'}">${Object.hasOwn(paths,app.icon||"")?icon(app.icon,18):esc(app.name==='Netflix'?'N':app.name.startsWith('SVT')?'svt':app.name.startsWith('TV4')?'4':app.name[0])}</span>${esc(app.name)}${icon('arrow',12)}</button>`).join('')}</div></section>
       <footer class="footer"><div class="live"><i class="dot"></i>${this.demoMode?'Preview · actions are simulated':this._hass?.connected===false?'Home Assistant disconnected':'Connected to Home Assistant'}<span>· ${esc(c.time_zone)}</span></div><div class="footer-actions">${c.edge_to_edge?`<button class="text-button" data-action="fullscreen">${this._exitFullscreen?'Expand dashboard':'Exit full screen'}</button>`:''}${auto?`<span><button class="toggle ${auto.state==='on'?'on':''}" data-action="auto" role="switch" aria-checked="${auto.state==='on'}" aria-label="Automatic dashboard" ${!['on','off'].includes(auto.state)?'disabled':''}></button>Auto dashboard</span>`:''}<button class="text-button" data-action="cast" ${!tv?'disabled':''} aria-disabled="${this._busy}">${icon('cast',12)} Show dashboard</button></div></footer>
     </div></ha-card>`);
     this.scheduleFit();
@@ -507,7 +509,12 @@ export class HomeboardTVCard extends HTMLElement {
       }
       if(action==='music-tv') await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,activity:this.tv().music_assistant_url});
       if(action==='scene') await this._hass.callService('scene','turn_on',{entity_id:c.scenes[index].entity});
-      if(action==='app') await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,activity:c.apps[index].activity});
+      if(action==='app') {
+        if (!this.tv() || this.tv().launch_apps===false) throw new Error('App launching is disabled for this TV');
+        const destination=this.appTarget(this.apps()[index]);
+        if (!destination) throw new Error('Configure a shortcut target for this TV');
+        await this._hass.callService('homeboard_tv','launch_app',{entry_id:this.tv().entry_id,target:destination});
+      }
       if(action==='home') await this._hass.callService('homeboard_tv','return_home',{entry_id:this.tv().entry_id});
       if(action==='cast') await this._hass.callService('homeboard_tv','show_dashboard',{entry_id:this.tv().entry_id});
       if(action==='auto') {
@@ -547,7 +554,7 @@ class HomeboardTVEditor extends HTMLElement {
   set hass(hass) { this._hass=hass; for (const form of this.shadowRoot.querySelectorAll('ha-form')) form.hass=hass; }
   render() {
     if(!this._config) return;
-    this.shadowRoot.innerHTML='<style>:host{display:block}p{line-height:1.6;color:var(--secondary-text-color)}textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:12px;border-radius:8px;font-family:monospace}button{padding:10px;margin-top:8px}.error{color:var(--error-color)}</style><ha-form></ha-form><p>Music Assistant: choose a player from the Home Assistant integration. Track information, controls and favorite playlists appear on the dashboard. Set maximum favorite playlists to 0 to show all. No URL is needed.</p><ha-form data-music-form></ha-form><p>Advanced configuration: optional Music Assistant interface links and playlists (music_assistant), scenes, TVs, apps, and custom price field mappings. Edit the JSON below, then apply.</p><textarea aria-label="Advanced card configuration"></textarea><button>Apply advanced configuration</button><p class="error" role="alert"></p>';
+    this.shadowRoot.innerHTML='<style>:host{display:block}p{line-height:1.6;color:var(--secondary-text-color)}textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:12px;border-radius:8px;font-family:monospace}button{padding:10px;margin-top:8px}.error{color:var(--error-color)}</style><ha-form></ha-form><p>Music Assistant: choose a player from the Home Assistant integration. Track information, controls and favorite playlists appear on the dashboard. Set maximum favorite playlists to 0 to show all. No URL is needed.</p><ha-form data-music-form></ha-form><p>Advanced configuration: optional Music Assistant interface links and playlists (music_assistant), scenes, TVs, app/media shortcuts, and custom price field mappings. Shortcuts accept activity (legacy Android), target, or targets keyed by androidtv_remote/webostv. Use tvs[].apps for per-TV overrides. Edit the JSON below, then apply.</p><textarea aria-label="Advanced card configuration"></textarea><button>Apply advanced configuration</button><p class="error" role="alert"></p>';
     const form=this.shadowRoot.querySelector('ha-form');
     form.hass=this._hass; form.data={...this._config,home_sensor_entities:homeSensorIds(this._config)};
     form.schema=[

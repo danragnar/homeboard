@@ -472,4 +472,60 @@ class WebOSControllerTests(unittest.IsolatedAsyncioTestCase):
         await self.controller.cast()
         self.assertEqual(len(self.hass.services.calls),1)
 
+    async def test_native_media_launch_preserves_params_context_and_grace(self):
+        self.controller.config['app_launch_method']='webostv'
+        self.controller.evaluate()
+        timer=self.hass.timers[-1]
+        context=object()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            await self.controller.launch(context=context,target={'type':'app','app_id':'verified.app',
+                'content_id':'episode:42','params':{'autoplay':True}})
+        self.assertTrue(timer.cancelled)
+        self.assertEqual(self.controller.reason,'app grace period')
+        self.assertEqual(self.hass.services.calls[0][0],('webostv','command',{'entity_id':'media_player.lg',
+            'command':'system.launcher/launch','payload':{'id':'verified.app','contentId':'episode:42','params':{'autoplay':True}}}))
+        self.assertIs(self.hass.services.calls[0][1]['context'],context)
+
+    async def test_invalid_or_offline_native_launch_does_not_start_grace(self):
+        self.controller.config['app_launch_method']='webostv'
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            with self.assertRaises(ValueError):
+                await self.controller.launch('netflix://')
+            self.states['media_player.lg'].state='off'
+            with self.assertRaises(ValueError):
+                await self.controller.launch(target={'type':'app','app_id':'verified.app'})
+        self.assertEqual(self.controller.suspended_until,0)
+        self.assertEqual(self.hass.services.calls,[])
+
+    async def test_script_fallback_keeps_app_grace_and_reports_failures(self):
+        self.controller.config['app_launch_method']='webostv'
+        self.hass.services.fail=True
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            with self.assertRaises(RuntimeError):
+                await self.controller.launch(target={'type':'script','entity_id':'script.play_episode'})
+        self.assertEqual(self.controller.last_error,'Receiver unavailable')
+        self.assertEqual(self.controller.reason,'app grace period')
+        self.assertEqual(self.hass.services.calls[0][0][:2],('script','turn_on'))
+
+    async def test_webos_home_sends_home_or_launches_custom_launcher(self):
+        self.controller.config['app_launch_method']='webostv'
+        context=object()
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            await self.controller.return_home(context)
+            self.assertEqual(self.hass.services.calls[-1][0],('webostv','button',{'entity_id':'media_player.lg','button':'HOME'}))
+            self.assertEqual(self.controller.reason,'dashboard exit pause')
+            self.assertIs(self.hass.services.calls[-1][1]['context'],context)
+            self.controller.config['home_app']='my.custom.launcher'
+            await self.controller.return_home()
+            self.assertEqual(self.hass.services.calls[-1][0],('webostv','command',{'entity_id':'media_player.lg',
+                'command':'system.launcher/launch','payload':{'id':'my.custom.launcher'}}))
+
+    async def test_webos_home_offline_does_not_pause_or_send(self):
+        self.controller.config['app_launch_method']='webostv'
+        self.states['media_player.lg'].state='off'
+        with patch.dict(sys.modules,{'homeassistant.exceptions':exceptions}):
+            with self.assertRaises(ValueError):await self.controller.return_home()
+        self.assertEqual(self.controller.home_until,0)
+        self.assertEqual(self.hass.services.calls,[])
+
 if __name__=='__main__': unittest.main()

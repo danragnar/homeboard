@@ -178,6 +178,48 @@ export function validateMusic(config) {
     if (tv.music_assistant_url && !musicURL(tv.music_assistant_url, true)) throw new Error('TV music_assistant_url must be a full HTTP(S) URL');
   }
 }
+export function appLaunchMethod(tv, states = {}) {
+  return states[tv?.auto_entity]?.attributes?.app_launch_method || tv?.app_launch_method || 'androidtv_remote';
+}
+export function shortcutTarget(app, method) {
+  const target = app?.targets?.[method] || app?.target || (method === 'androidtv_remote' && app?.activity ? {type:'activity',activity:app.activity} : null);
+  if ((target?.type==='app' && method!=='webostv') || (target?.type==='activity' && method!=='androidtv_remote')) return null;
+  return target;
+}
+export function validateShortcuts(config) {
+  const object = value => value && typeof value === 'object' && !Array.isArray(value);
+  const text = value => typeof value === 'string' && value.trim() && value === value.trim();
+  function validateTarget(target, method) {
+    const fields={activity:['type','activity'],app:['type','app_id','content_id','params'],url:['type','url'],script:['type','entity_id','variables']};
+    if (!object(target) || !Object.hasOwn(fields,target.type) || Object.keys(target).some(k=>!fields[target.type].includes(k))) throw new Error('Unknown shortcut target type or fields');
+    if (target.type==='activity' && (!text(target.activity) || method==='webostv')) throw new Error('Activity targets require an Android activity');
+    if (target.type==='app' && (!text(target.app_id) || method==='androidtv_remote')) throw new Error('App targets require a webOS app_id');
+    if (target.content_id!==undefined && !text(target.content_id)) throw new Error('content_id must be a nonempty string');
+    for (const key of ['params','variables']) if (target[key]!==undefined && !object(target[key])) throw new Error(`${key} must be an object`);
+    if (target.type==='url' && !musicURL(target.url,true)) throw new Error('Shortcut url must be a full HTTP(S) URL without credentials');
+    if (target.type==='script' && (typeof target.entity_id!=='string' || !/^script\.[a-z0-9_]+$/.test(target.entity_id))) throw new Error('Script target needs a script entity ID');
+  }
+  function validateApps(apps) {
+    if (!Array.isArray(apps)) throw new Error('TV apps must be a list');
+    for (const app of apps) {
+      if (!app || !text(app.name) || (!app.activity && !app.target && !app.targets)) throw new Error('Each shortcut needs a name and activity, target or targets');
+      if (app.activity!==undefined && !text(app.activity)) throw new Error('Shortcut activity must be a nonempty string');
+      if (app.target!==undefined) validateTarget(app.target);
+      if (app.targets!==undefined) {
+        if (!object(app.targets) || !Object.keys(app.targets).length) throw new Error('targets must contain platform targets');
+        for (const [method,target] of Object.entries(app.targets)) {
+          if (!['androidtv_remote','webostv'].includes(method)) throw new Error('Unknown shortcut platform');
+          validateTarget(target,method);
+        }
+      }
+    }
+  }
+  validateApps(config.apps || []);
+  for (const tv of config.tvs || []) {
+    if (tv.app_launch_method!==undefined && !['androidtv_remote','webostv'].includes(tv.app_launch_method)) throw new Error('Unknown TV app launch method');
+    if (tv.apps!==undefined) validateApps(tv.apps);
+  }
+}
 export const DEFAULT_CONFIG = {
   type:"custom:homeboard-tv-card", title:"A little more at home.", home_name:"Our home",
   tv_mode:true, theme:"aurora", edge_to_edge:false, keyboard_navigation:true, time_zone:"Europe/Stockholm", locale:"en-GB", temperature_unit:"°C", price_unit:"SEK/kWh",

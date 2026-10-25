@@ -5,6 +5,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 from .const import DEFAULTS, DOMAIN
 from .browser import browser_errors
+from .launch import config_errors as app_errors
 
 def schema(values):
     def field(key, default=None, required=False):
@@ -22,6 +23,8 @@ def schema(values):
         field("idle_apps"): str,
         field("idle_guard"): entity(["binary_sensor", "input_boolean"]),
         field("remote_entity"): entity("remote"),
+        field("app_launch_method"): selector.SelectSelector(selector.SelectSelectorConfig(options=[{"value":"androidtv_remote","label":"Android TV Remote"},{"value":"webostv","label":"LG webOS"}])),
+        field("home_app"): str,
         field("dashboard_path"): str,
         field("view_path"): str,
         field("dashboard_app"): str,
@@ -39,8 +42,11 @@ def schema(values):
     })
 
 def errors(data):
+    launch_errors = app_errors(data)
     if data["mode"] == "browser":
-        return browser_errors(data)
+        return {**browser_errors(data), **launch_errors}
+    if launch_errors:
+        return launch_errors
     if not data.get("activity_entity") and not data.get("idle_guard"):
         return {"base": "missing_guard"}
     if data["mode"] == "script" and not data.get("dashboard_script"):

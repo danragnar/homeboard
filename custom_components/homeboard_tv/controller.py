@@ -5,6 +5,7 @@ from time import monotonic
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from .policy import OFFLINE, Snapshot, idle_reason, connection_retry_reason
+from .launch import launch_call
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -254,30 +255,51 @@ class Controller:
             self.busy = False
             self.evaluate()  # A still-idle receiver can retry after the cooldown.
 
-    async def launch(self, activity, context=None):
+    async def launch(self, activity=None, context=None, target=None):
         from homeassistant.exceptions import ServiceValidationError
-        remote = self.config.get("remote_entity")
-        if not remote:
-            raise ServiceValidationError("Configure an Android TV remote entity for this TV first")
+        try:
+            domain, service, data = launch_call(self.config, activity, target)
+        except ValueError as exc:
+            raise ServiceValidationError(str(exc)) from exc
+        if domain == "webostv":
+            state = self.hass.states.get(data["entity_id"])
+            if not state or state.state in OFFLINE:
+                raise ServiceValidationError("LG webOS TV unavailable; app command was not sent")
         self.returned_to_launcher = False
         self.suspended_until = monotonic() + self.config.get("app_grace_seconds", 600)
         self.awaiting_dashboard = False
         self.cancel_timer()
         self.evaluate()
-        async with self.dispatch_lock:
-            await self.hass.services.async_call("remote", "turn_on", {
-                "entity_id": remote, "activity": activity,
-            }, blocking=True, context=context)
+        self.last_error = None
+        try:
+            async with self.dispatch_lock:
+                await self.hass.services.async_call(domain, service, data, blocking=True, context=context)
+        except Exception as exc:
+            self.last_error = str(exc)
+            raise
+        finally:
+            self.evaluate()
 
     async def return_home(self, context=None):
         """Leave the dashboard without immediately triggering another idle launch."""
         from homeassistant.exceptions import ServiceValidationError
-        remote = self.config.get("remote_entity")
-        if not remote:
-            raise ServiceValidationError("Configure an Android TV remote entity for this TV first")
-        state = self.hass.states.get(remote)
+        webos = self.config.get("app_launch_method", "androidtv_remote") == "webostv"
+        entity = self.config.get("webos_entity" if webos else "remote_entity")
+        if not entity:
+            raise ServiceValidationError("Configure an LG webOS TV entity for this screen first" if webos else "Configure an Android TV remote entity for this TV first")
+        state = self.hass.states.get(entity)
         if not state or state.state in OFFLINE:
-            raise ServiceValidationError("Android TV remote unavailable; Home command was not sent")
+            raise ServiceValidationError("TV control unavailable; Home command was not sent")
+        if webos:
+            if self.config.get("home_app"):
+                try:
+                    domain, service, data = launch_call(self.config, target={"type": "app", "app_id": self.config["home_app"]})
+                except ValueError as exc:
+                    raise ServiceValidationError(str(exc)) from exc
+            else:
+                domain, service, data = "webostv", "button", {"entity_id": entity, "button": "HOME"}
+        else:
+            domain, service, data = "remote", "send_command", {"entity_id": entity, "command": "HOME"}
         # Keep a separate pause: a browser-to-launcher transition intentionally
         # clears app-launch grace, but must not undo the user's dashboard exit.
         self.home_until = monotonic() + self.config.get("app_grace_seconds", 600)
@@ -288,9 +310,7 @@ class Controller:
         self.evaluate()
         try:
             async with self.dispatch_lock:
-                await self.hass.services.async_call("remote", "send_command", {
-                    "entity_id": remote, "command": "HOME",
-                }, blocking=True, context=context)
+                await self.hass.services.async_call(domain, service, data, blocking=True, context=context)
         except Exception as exc:
             self.last_error = str(exc)
             raise

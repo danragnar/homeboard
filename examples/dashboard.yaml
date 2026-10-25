@@ -74,7 +74,7 @@ views:
               - name: Bedroom · LG TV
                 entry_id: REPLACE_WITH_LG_CONFIG_ENTRY_ID
                 auto_entity: switch.bedroom_auto_dashboard
-                # Enable only if this entry has a Google/Android TV remote.
+                # Enable after configuring LG webOS app launching and native shortcut targets.
                 launch_apps: false
             # Optional. Omit this section to hide the music box.
             # Select the MA player in the visual editor, or set its entity here.

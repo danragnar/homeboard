@@ -1,5 +1,11 @@
 # Changes
 
+## 0.11.0
+
+- Add configurable Android TV Remote and LG webOS app launching, including app IDs, content IDs and app-specific parameters, browser URLs and HA script targets.
+- Resolve card shortcuts for the selected platform with optional per-TV lists; keep legacy Android activities and disable missing platform targets.
+- Support native webOS TV Home or a custom launcher app ID, and route Music Assistant browser links through the selected app launch method.
+
 ## 0.10.0
 
 - Make browser dashboard launching configurable between Android TV Remote and LG webOS command. Existing entries keep Android TV Remote behavior.

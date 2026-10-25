@@ -63,9 +63,9 @@ npm run package
 
 For a fork, replace `danragnar/homeboard` with its actual owner/repository. The command sets the integration's documentation, issue tracker and codeowner. Review the generated codeowner if using an organization repository. Keep GitHub Issues enabled.
 
-Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.10.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
+Commit/push the prepared source, create a tag matching `manifest.json` (currently `v0.11.0`), and push that tag. The included release workflow validates the metadata and version, runs checks, and publishes a GitHub Release with source and integration-only archives. It refuses to release unprepared metadata or a mismatched version tag. Publishing and repository creation are not performed by the local preparation command.
 
-The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.10.0.zip`.
+The root `hacs.json` uses normal repository-based integration installation; it does not require a release ZIP to exist before HACS can download the default branch. Each release includes `homeboard_tv.zip` as a convenience archive containing the **contents** of the integration directory. It is distinct from the source bundle `homeboard-tv-0.11.0.zip`.
 
 The integration follows [HACS integration structure](https://www.hacs.dev/docs/publish/integration/): one integration directory containing all runtime files. HACS expects the repository to be available on GitHub; see [custom repositories](https://www.hacs.dev/docs/faq/custom_repositories/).
 
@@ -111,7 +111,7 @@ Replace every example destination. Install the [Music Assistant HA integration](
 
 Open navigates **the browser displaying the card**. For Music Assistant installed as a Home Assistant app, `url` can instead be your actual sidebar path starting with `/`; Homeboard navigates within HA, whose sidebar loads the authenticated interface. Copy the actual sidebar path from your installation rather than using a temporary `/api/hassio_ingress/...` session URL. An absolute Music Assistant URL opens its web interface in the same browser and needs its own working login. Playlist links only navigate; they do not auto-play. Copy their exact URLs from Music Assistant. [Music Assistant documents URLs](https://www.music-assistant.io/faq/how-to/) for selecting a player, opening playlists, and showing Now Playing, for example `https://music.example/#/home?player=Livingroom&showFullscreenPlayer=true`. Omit `music_assistant` or set it to `null` to hide the box.
 
-To offer **Open on TV**, add `music_assistant_url: https://music.example/#/home?player=Livingroom` to the relevant existing `tvs` item. It must be a full HTTP(S) URL. The button uses that TV entry's existing `homeboard_tv.launch_app` action, Android TV remote and app-launch grace period; `launch_apps: false` hides it. A compatible browser such as TV Bro must be installed, handle the link, and already be signed in. Link routing and Music Assistant's own remote-control usability need testing on the device. For LG without an Android TV remote, use your existing webOS browser script separately.
+To offer **Open on TV**, add `music_assistant_url: https://music.example/#/home?player=Livingroom` to the relevant existing `tvs` item. It must be a full HTTP(S) URL. The button uses that TV entry's `homeboard_tv.launch_app` action, configured app launch method and app-launch grace period; `launch_apps: false` hides it. A compatible browser such as TV Bro must be installed, handle the link, and already be signed in. Link routing and Music Assistant's own remote-control usability need testing on the device. With **LG webOS** app launching selected, it opens through the native webOS browser command.
 
 **Keeping the dashboard visible while music plays.** The embedded player stays inside Homeboard and does not navigate away. Use a separate speaker/player, or leave Homeboard open in a TV browser while music plays on a player that does not displace that browser. A browser dashboard can display and control any configured Music Assistant player, but does not itself become a Music Assistant audio player. Native audio playback on that same TV can still bring another app to the foreground, depending on the TV.
 
@@ -184,15 +184,15 @@ If the LG entity does not reliably report your launcher, leave **Foreground app 
 
 Homeboard sends `webostv.command` with `command: system.launcher/open` and the dashboard URL as `payload.target`, using the existing stable-idle delay and cooldown. Returning from a verified foreground app to the allowed launcher starts a fresh idle delay. Browser launches do not use Cast connection retries. Existing Android TV browser entries retain their previous behavior when no launch method has been saved.
 
-This selector controls dashboard browser launching. Streaming-app shortcuts, **Open on TV** for Music Assistant, and **Google TV Home** still use the separately configured Android TV remote. Disable the card's app controls with `launch_apps: false` for a native LG-only screen. The older custom-script route in `examples/lg-package.yaml` remains available.
+This selector controls dashboard browser launching. Set **App launch and Home control method** separately to **LG webOS** to enable native app/media shortcuts, Music Assistant browser links and TV Home. Existing configurations retain Android TV Remote for app launching. The older custom-script route in `examples/lg-package.yaml` remains available.
 
 For script transport, configure `dashboard_script` and an `idle_guard` binary sensor. **`on` alone is not proof that LG is idle.** The example allows only source names you have verified to mean the home screen; replace the example `Home` source with values observed in your LG entity. If your model does not expose a trustworthy idle signal, automatic takeover cannot be determined safely; use an external receiver or keep the auto-dashboard switch off and invoke your opening script manually.
 
 The LG browser needs its own authenticated HA session. Sign in on the TV using an appropriate HA account. Browser engine, cookies, HTTPS support, and modern JavaScript vary with webOS versions. Opening a URL successfully does not establish that HA rendered or logged in. The native integration does not make every LG model a Chromecast. See [webOS commands](https://www.home-assistant.io/actions/webostv.command/).
 
-## Return to Google TV Home
+## Return to TV Home
 
-The **Google TV Home** button beside the streaming-app shortcuts sends `HOME` through the selected TV entry's configured Android TV remote. It works with Browser and Cast dashboard transports. It does not use a launcher package ID or send a power command. The button is disabled when no TV is selected or the card TV entry has `launch_apps: false`; the integration validates that its remote is configured and online before sending the command. On a Cast dashboard, use the phone/computer dashboard controls if the receiver does not accept pointer/remote interaction.
+The **TV Home** button uses the selected screen's **App launch and Home control method**. Android sends `HOME` through its configured remote. LG sends `webostv.button` with `HOME`, or launches **LG home launcher app ID** if you supplied your custom launcher's verified app ID. No power command is sent. The button is disabled when no TV is selected or the card TV entry has `launch_apps: false`; the integration checks that the configured control entity is online. On a Cast dashboard, use phone/computer controls if the receiver does not accept pointer/remote interaction.
 
 Exiting also pauses automatic dashboard reopening for that entry's `app_grace_seconds` (10 minutes by default). Returning to the launcher does not cancel this explicit exit pause. Afterwards, normal power, playback, foreground, cooldown and stable-idle checks apply. **Show dashboard** clears the pause early and still requires a safely idle screen. Turn **Auto dashboard** off if you want to keep automatic reopening disabled until you turn it on again. The temporary exit pause is in memory and resets if the integration restarts; the Auto dashboard switch persists across restarts.
 
@@ -210,7 +210,7 @@ Defaults: **45 seconds stable idle**, **5 minutes between automatic attempts**, 
 6. Keep a visible dashboard session. In Cast mode, if the Cast entity still reports the configured dashboard app while an independent foreground entity reports an allowed launcher/screensaver and the screen power entity is online, close that stale HA receiver, wait up to 10 seconds for it to close, recheck all guards, then cast the configured view. This only closes the Cast receiver app; it does not turn off the physical screen. In Browser mode, the same verified launcher state permits opening the URL directly; an already-active browser is never reopened. Inspect the Cast entity's `app_name` and override `dashboard_app` if needed.
 7. Failed or still-idle dispatches can retry after the cooldown. The switch exposes the last error; this is an attempt interval, not an infinite tight retry loop.
 
-App launches cancel pending casts, start the grace period, and use the configured Android TV remote. A timer reevaluates when grace expires even without another entity event. In Browser mode, a verified app-to-launcher transition ends grace and the previous dispatch cooldown only after all playback/power/idle guards permit a new launch. The full stable-idle delay still applies. Missing foreground information does not count as an app exit; failed launches on the same home screen retain their cooldown. Foreground detection continues protecting app browsing after grace expires. Turning the auto-dashboard switch off persists across HA restarts.
+App/media launches cancel pending dashboard dispatches, start the grace period, and use the configured Android TV Remote or LG webOS method (or the shortcut's HA script). Invalid targets fail before starting grace. A failed launch records its error and retains the bounded grace period. A timer reevaluates when grace expires even without another entity event. In Browser mode, a verified app-to-launcher transition ends grace and the previous dispatch cooldown only after all playback/power/idle guards permit a new launch. The full stable-idle delay still applies. Missing foreground information does not count as an app exit; failed launches on the same home screen retain their cooldown. Foreground detection continues protecting app browsing after grace expires. Turning the auto-dashboard switch off persists across HA restarts.
 
 A successful Cast action means the request was dispatched; it does not prove the TV connected or rendered. Status is `receiver active; dashboard unconfirmed` until the receiver supplies a nonempty media title, then `dashboard reported`. A title is a receiver signal, not proof every custom card rendered. For a receiver opened by Homeboard, an absent title triggers one connection retry after 45 seconds by default, reusing the existing receiver. Retries require an online independent screen-power entity, a foreground entity reporting an explicitly allowed Cast receiver app (default `com.google.android.apps.mediashell`), and every configured guard. Other apps, screen-off, disabled automation and app grace prevent retries. After the last retry, Homeboard allows another retry-delay window for the title before recording an error and stopping recovery. Set `cast_retry_limit` (0–3), `cast_retry_seconds` (35–600), and `cast_receiver_apps` in integration options. These bounded connection retries are separate from the normal automatic-dispatch cooldown. The auto-dashboard switch also exposes the selected entity IDs, foreground app, playback state, remaining grace/cooldown seconds, retry count and awaiting-dashboard state for diagnosis. Remaining times are snapshots updated with entity changes, not a live countdown. If the TV shows “Not connected” or a WebSocket error, check the HTTPS external URL, DNS, certificate and reverse-proxy WebSocket forwarding. A fresh cast may clear a transient connection failure. Avoid changing network settings if the same URL works on retry.
 
@@ -241,7 +241,7 @@ The visual card editor provides entity selectors for price, power, weather, and 
 | `theme` | `aurora` (default): blue and mint. `aurora-green`: sea green and mint. `aurora-teak`: sea green with teak and tulip accents. `nordic-green`: sea green, cream and ochre. `forest`: warm greens. `nordic`: muted vintage blues. `linen`: light day palette. `teak`: warm evening palette. |
 | `edge_to_edge` | `true` fills the viewport above HA navigation using the browser top layer and removes the outer card border in TV mode. Older browsers without top-layer support use fixed positioning, which may still be constrained by the host layout. Default `false`. Escape or **Exit full screen** returns to HA navigation; **Expand dashboard** re-enters. Disabled inside the HA card editor. |
 | `keyboard_navigation` | Arrow-key spatial navigation, default `true`; requires a browser/receiver that forwards key events. |
-| `tvs` | Objects with `name`, `entry_id`, optional `auto_entity`, `launch_apps`. Set `launch_apps: false` on an LG-only entry without an Android remote. |
+| `tvs` | Objects with `name`, `entry_id`, optional `auto_entity`, `launch_apps`, `apps` (per-TV shortcut list) and `app_launch_method` (card fallback if no auto-dashboard switch is mapped). `launch_apps: false` disables app/Home controls. |
 | `apps` | Objects with `name`, `activity`, optional hexadecimal `color` and built-in `icon` (for example `fire`). Add/reorder freely. |
 
 Scene icons supported: `sun`, `moon`, `tv`, `bolt`, `home`, `scene`, `temp`, `lock`, `shield`, `cloud`, `rain`, `cast`, `power`.
@@ -280,6 +280,40 @@ HA scenes are snapshots, not on/off switches. Without an `active_entity`, Homebo
 
 Netflix starts with `netflix://`. SVT and TV4 start with their public HTTPS links. **Verify routing on your Google TV:** Android may open a browser or reject a link depending on the installed apps and their link associations. Set each `activity` to an app-supported deep link or the actual package ID shown by your remote's `current_activity`. Package-ID launching itself is unreliable on some Android TV versions; the activities are deliberately editable rather than assuming a universal package. See [Android TV Remote](https://www.home-assistant.io/integrations/androidtv_remote/).
 
+### App and specific-media shortcuts
+
+In each screen's integration options, choose **App launch and Home control method**: **Android TV Remote** or **LG webOS**. Set its remote or LG TV entity. Dashboard browser launching remains independently configurable. For rooted webOS with a custom home screen, optionally enter its verified **LG home launcher app ID**.
+
+In the card editor's advanced JSON or YAML, a shortcut can use `targets` keyed by `androidtv_remote` and `webostv`. A common `target` works for a shared browser URL or script. Existing `activity` values remain Android-only fallbacks. The card reads the app launch method from the TV's `auto_entity` switch; if you do not map that switch, set the card TV's `app_launch_method` to match the integration. The backend always validates against the integration's configured method. A shortcut without a compatible target is disabled, rather than guessing how an Android link should work on LG.
+
+```yaml
+apps:
+  - name: Favourite programme
+    targets:
+      androidtv_remote:
+        type: activity
+        activity: https://REPLACE_WITH_VERIFIED_ANDROID_DEEP_LINK
+      webostv:
+        type: app
+        app_id: REPLACE_WITH_VERIFIED_WEBOS_APP_ID
+        content_id: REPLACE_WITH_APP_SPECIFIC_CONTENT_ID
+        # Optional app-specific object; use keys supported by that app.
+        # params: {contentTarget: REPLACE_WITH_VERIFIED_VALUE}
+```
+
+| Target type | Fields | Behavior |
+| --- | --- | --- |
+| `activity` | `activity` | Android app link or package ID through the configured remote. |
+| `app` | `app_id`, optional `content_id` and `params` | LG `system.launcher/launch`; `content_id` becomes `contentId` and `params` is passed unchanged. Omit both optional fields to open just the app. |
+| `url` | `url` | Full credential-free HTTP(S) URL, opened through Android Remote or LG's browser according to the app launch method. |
+| `script` | `entity_id`, optional `variables` | Start an HA `script.*` entity with app grace applied. Use for provider-specific sequences. |
+
+To customize one television, put its entire shortcut list under that card `tvs` item's `apps`; it replaces the global list for that TV. `apps: []` hides its shortcuts. See [examples/app-shortcuts.yaml](examples/app-shortcuts.yaml) for media, browser and script examples.
+
+A `content_id` is a provider-specific launch value, not necessarily a share URL or a raw movie ID. App-specific parameters, availability, account selection and autoplay must be verified on your TV. Root access does not make an app accept unsupported deep links. Homeboard reports that a launch was requested; it does not confirm that the correct media started playing. Find installed app IDs from your rooted TV with `luna-send -n 1 -f luna://com.webos.applicationManager/listApps '{}'`. Do not substitute an Android package ID or an LG source display name for the webOS app ID.
+
+For a direct HA call, use `homeboard_tv.launch_app` with `entry_id` and a `target` object from the table. The legacy `activity` field still works for Android and HTTP(S) browser links on LG. Provide exactly one of `activity` or `target`.
+
 Homeboard supports spatial navigation with arrow keys, a visible focus ring, and Enter/Space/Select activation in browsers that deliver keyboard events. Navigation runs before page-level handlers and prefers controls in the same row or column. The first remote key establishes focus on a scene/app; a subsequent OK/Select activates it. Held OK does not repeat actions. On the TV selector, up/down changes the selection and left/right moves to another control. Live updates patch existing controls instead of recreating them; unrelated entity changes do not redraw the card. Focus survives sensor refreshes and notices; select fields keep their native arrow-key behavior. This does not make the physical Google TV remote work in every receiver. A standard Google Cast receiver on a TV is primarily a display; a Google TV D-pad does not automatically become a pointer for an HA Cast custom card. Use the same dashboard on your phone/tablet to tap scenes and apps. A compatible TV browser supports keyboard/pointer interaction. Homeboard does not claim remote-navigation support inside the Cast receiver.
 
 ### TV Bro manual trial
@@ -306,7 +340,7 @@ npm run preview
 # Open http://127.0.0.1:8124/preview/
 npm run check
 npm test
-npm run package  # Creates artifacts/homeboard-tv-0.10.0.zip and homeboard_tv.zip
+npm run package  # Creates artifacts/homeboard-tv-0.11.0.zip and homeboard_tv.zip
 ```
 
 Open `/preview/navigation-check.html` and select **Run checks** for browser-level focus, live-update, and activation regressions using simulated data.

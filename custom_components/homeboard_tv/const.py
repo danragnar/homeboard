@@ -1,12 +1,14 @@
 """Shared configuration for Homeboard TV."""
 DOMAIN = "homeboard_tv"
-VERSION = "0.10.0"
+VERSION = "0.11.0"
 LEGACY_IDLE_APPS = "com.google.android.apps.tv.launcher,com.google.android.tvlauncher"
 DEFAULTS = {
     "name": "Living room",
     "mode": "cast",
     "browser_url": "",
     "browser_launch_method": "androidtv_remote",
+    "app_launch_method": "androidtv_remote",
+    "home_app": "",
     "browser_app": "com.phlox.tvwebbrowser",
     "dashboard_path": "homeboard-home",
     "view_path": "overview",

@@ -9,8 +9,8 @@ show_dashboard:
         config_entry:
           integration: homeboard_tv
 launch_app:
-  name: Launch Google TV app
-  description: Suspend automatic dashboard launches briefly, then launch an activity on the configured Android TV remote.
+  name: Launch app or media
+  description: Pause automatic dashboard opening, then launch an Android activity, webOS app/media, browser URL, or HA script. Provide exactly one of activity or target.
   fields:
     entry_id:
       name: Screen configuration
@@ -19,14 +19,18 @@ launch_app:
         config_entry:
           integration: homeboard_tv
     activity:
-      name: App link or package ID
-      required: true
+      name: Legacy Android activity or browser URL
       example: "netflix://"
       selector:
         text:
+    target:
+      name: App or media target
+      description: "An object with type: activity, app, url, or script. webOS app fields: app_id, optional content_id and params. URL field: url. Script fields: entity_id and optional variables."
+      selector:
+        object:
 return_home:
-  name: Return to Google TV Home
-  description: Send HOME to the configured Android TV remote and pause automatic dashboard reopening for the app-grace period (10 minutes by default).
+  name: Return to TV Home
+  description: Send HOME through the configured TV control method, or launch the configured webOS home app. Pause automatic dashboard reopening for the app-grace period (10 minutes by default).
   fields:
     entry_id:
       name: Screen configuration

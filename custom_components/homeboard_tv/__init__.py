@@ -17,7 +17,7 @@ async def async_setup(hass: HomeAssistant, config):
         if controller is None:
             raise ServiceValidationError("Homeboard TV entry not loaded; check entry_id")
         if call.service == "launch_app":
-            await controller.launch(call.data["activity"], call.context)
+            await controller.launch(call.data.get("activity"), call.context, target=call.data.get("target"))
         elif call.service == "return_home":
             await controller.return_home(call.context)
         else:
@@ -32,7 +32,10 @@ async def async_setup(hass: HomeAssistant, config):
     base = {vol.Required("entry_id"): cv.string}
     hass.services.async_register(DOMAIN, "show_dashboard", handle, schema=vol.Schema(base))
     hass.services.async_register(DOMAIN, "return_home", handle, schema=vol.Schema(base))
-    hass.services.async_register(DOMAIN, "launch_app", handle, schema=vol.Schema({**base, vol.Required("activity"): vol.All(cv.string, vol.Length(min=1))}))
+    hass.services.async_register(DOMAIN, "launch_app", handle, schema=vol.Any(
+        vol.Schema({**base, vol.Required("activity"): vol.All(cv.string, vol.Length(min=1))}),
+        vol.Schema({**base, vol.Required("target"): dict}),
+    ))
     return True
 
 async def async_setup_entry(hass, entry):
