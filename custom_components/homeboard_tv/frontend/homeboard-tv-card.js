@@ -1,4 +1,4 @@
-import {DEFAULT_CONFIG, esc, finite, number, temperatureMean, priceIntervals, priceSummary, priceBand, homeSensorIds, homeSensors, sceneStatus, zonedDate, calendarEvents, validateMusic, musicURL, musicNowPlaying, musicCommand} from './model.mjs';
+import {DEFAULT_CONFIG, esc, finite, number, priceIntervals, priceSummary, priceBand, homeSensorIds, sceneStatus, zonedDate, calendarEvents, dressingAdvice, validateMusic, musicURL, musicNowPlaying, musicCommand} from './model.mjs';
 import {navigationKey, directionalTarget} from './navigation.mjs';
 import {patchHTML} from './dom.mjs';
 import {styles} from './styles.mjs';
@@ -21,6 +21,9 @@ const paths = {
  sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5',
  cloud:'M6 18a4 4 0 1 1 1-7.9A6 6 0 0 1 19 12a3 3 0 1 1 0 6Z',
  rain:'M6 15a4 4 0 1 1 1-7.9A6 6 0 0 1 19 9a3 3 0 1 1 0 6M8 18l-1 3m6-3-1 3m6-3-1 3',
+ snow:'M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M7 5l5 3 5-3M7 19l5-3 5 3',
+ shirt:'M8 4 5 7l-2 2 4 4 2-2v9h6v-9l2 2 4-4-2-2-3-3c-2 2-6 2-8 0Z',
+ jacket:'M9 3 5 6l-2 5 4 2 2-3v11h6V10l2 3 4-2-2-5-4-3m-3 0 3 5 3-5M12 8v13',
  lock:'M6 10h12v11H6ZM8 10V6a4 4 0 0 1 8 0v4M12 14v3',
  shield:'m12 2 9 4v6c0 5-9 10-9 10S3 17 3 12V6ZM8 12l3 3 5-6',
  scene:'m12 3 2.8 5.7L21 9.8l-4.5 4.4 1 6.3-5.5-3-5.5 3 1-6.3L3 9.8l6.2-1.1Z',
@@ -433,9 +436,8 @@ export class HomeboardTVCard extends HTMLElement {
     const band=priceBand(current,rows);
     const power=states[c.power_entity], powerValue=finite(power?.state), powerUnit=power?.attributes?.unit_of_measurement || 'W';
     const showKW=powerUnit==='W' && powerValue!==null && Math.abs(powerValue)>=1000;
-    const sensors=homeSensors(states,c);
-    const temp=temperatureMean(states,sensors.filter(item=>item.type==='temperature').map(item=>item.id),c.temperature_unit);
     const weather=states[c.weather_entity];
+    const dressing=dressingAdvice(weather?.attributes?.temperature,weather?.state);
     const agenda=calendarEvents(this._calendarEvents,c,now), calendar=states[c.calendar_entity];
 
     const tv=this.tv(), auto=tv?.auto_entity ? states[tv.auto_entity] : null;
@@ -457,14 +459,10 @@ export class HomeboardTVCard extends HTMLElement {
         <section class="card calendar"><div class="card-head"><span class="card-title">${icon('calendar')} Coming up</span><span class="reduced">NEXT ${c.calendar_days} DAYS</span></div><div class="calendar-source">${esc(calendar?.attributes?.friendly_name || c.calendar_entity || 'Your calendar')}</div>
           <div class="agenda">${!c.calendar_entity?'<div class="empty">Choose a Home Assistant calendar in the card editor.</div>':this._calendarError || !calendar || ['unknown','unavailable'].includes(calendar.state)?`<div class="empty">${esc(this._calendarError || 'Calendar unavailable. Check the entity and its connection.')}</div>`:agenda.length?agenda.map(event=>`<div class="agenda-event"><div class="agenda-when">${esc(this.calendarWhen(event))}</div><div class="agenda-title">${esc(event.summary)}</div>${event.location?`<div class="agenda-location">${esc(event.location)}</div>`:''}</div>`).join(''):`<div class="empty">${this._calendarPending?'Loading events…':'No upcoming events.'}</div>`}</div>
         </section>
-        <section class="card home-sensors"><div class="card-head"><span class="card-title">${icon('home')} Home sensors</span><span class="reduced">LIVE · VIEW ONLY</span></div>
-          ${temp.total?`<div class="sensor-average"><div><div class="energy-label">Inside, on average</div><div class="stat-number">${this.fmt(temp.value)}<span class="unit">${esc(c.temperature_unit)}</span></div></div><span class="reduced">${temp.count}/${temp.total} reporting</span></div>`:''}
-          <div class="sensor-list">${sensors.length?sensors.map(sensor=>`<div class="sensor-item ${sensor.tone}"><span class="sensor-icon">${icon(sensor.icon,19)}</span><div class="sensor-detail"><div class="sensor-name" title="${esc(sensor.name)}">${esc(sensor.name)}</div><div class="sensor-value">${esc(sensor.value)}${sensor.unit?`<span class="unit">${esc(sensor.unit)}</span>`:''}</div></div></div>`).join(''):'<div class="empty">Choose home sensors in the card editor to see temperatures, locks and more.</div>'}</div>
-        </section>
+        <section class="card dressing"><div class="card-head"><span class="card-title">${icon('shirt')} Klä på dig</span><span class="reduced">UT I DAG</span></div><div class="dressing-main"><span class="dressing-icon">${icon(dressing.icon,34)}</span><div><strong>${esc(dressing.headline)}</strong><span>${weather?.attributes?.temperature === undefined ? 'Anslut en väderentitet för personliga råd.' : `${this.fmt(weather.attributes.temperature,0)}${esc(weather.attributes.temperature_unit || c.temperature_unit)} just nu`}</span></div></div><ul class="dressing-list">${dressing.items.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></section>
         <section class="card weather"><div class="card-head"><span class="card-title">${icon('sun')} A look outside</span><span class="reduced">${esc(c.weather_location || c.home_name)}</span></div><div class="forecast-current"><div><div class="weather-temp">${this.fmt(weather?.attributes?.temperature,0)}<span class="unit">${esc(weather?.attributes?.temperature_unit||c.temperature_unit)}</span></div><div class="condition">${esc((weather?.state === 'partlycloudy' ? 'Partly cloudy' : (weather?.state || 'Weather not configured').replaceAll('-',' ')))}</div></div><div class="weather-symbol">${icon(weatherIcon(weather?.state || ''),48)}</div></div>
           <div class="forecast">${forecast.length?forecast.map(f=>`<div class="forecast-day">${esc(c.forecast_type==='hourly'?this.time(f.datetime):new Date(f.datetime).toLocaleDateString(c.locale,{timeZone:c.time_zone,weekday:'short'}))}${icon(weatherIcon(f.condition||''),20)}<strong>${this.fmt(f.temperature,0)}°</strong>${f.templow!==undefined?`<small>${this.fmt(f.templow,0)}°</small>`:''}</div>`).join(''):`<div class="empty" style="grid-column:1/-1;padding:0">${esc(this._weatherError || 'Choose a weather entity for the forecast.')}</div>`}</div>
         </section>
-
         <section class="card scenes"><div class="card-head"><span class="card-title">${icon('scene')} Set the mood</span><span class="reduced">SCENES</span></div><div class="scene-list">${c.scenes.length?c.scenes.map((scene,i)=>{const status=sceneStatus(states,scene,c);return `<button class="scene ${status==='Active'?'active':''}" data-action="scene" data-index="${i}" aria-disabled="${this._busy}"><span class="scene-top">${icon(scene.icon || 'scene',18)}${status==='Active'?'<i class="dot" style="color:var(--mint)"></i>':''}</span><span class="scene-name">${esc(scene.name || states[scene.entity]?.attributes?.friendly_name || scene.entity)}</span><span class="scene-status">${esc(status)}</span></button>`}).join(''):'<div class="empty">Add scenes and optional activity helpers.</div>'}</div></section>
       </main>
       ${this.musicPanel()}

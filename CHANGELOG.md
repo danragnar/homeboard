@@ -2,6 +2,7 @@
 
 ## 0.8.0
 
+- Replace the Peace of Mind panel with a child-friendly dressing guide that adapts to the current weather, temperature, rain, and snow.
 - Load Music Assistant favorite playlists automatically with names, artwork, playback, refresh, and a configurable display limit (0 shows all).
 
 ## 0.7.0

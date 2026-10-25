@@ -14,6 +14,32 @@ export function temperatureMean(states, ids = [], unit = "°C") {
   }).filter(n => n !== null);
   return {value: values.length ? values.reduce((a,b) => a+b, 0)/values.length : null, count: values.length, total: ids.length};
 }
+// A small, intentionally conservative guide for getting children ready to go out.
+// It uses the current weather observation rather than a forecast, so the advice
+// changes as soon as the configured weather entity does.
+export function dressingAdvice(temperature, condition = '') {
+  const value = finite(temperature), weather = String(condition).toLowerCase();
+  if (value === null) return {headline:'Kolla vädret först', items:['Välj kläder efter hur det känns ute'], icon:'cloud'};
+  const snowy = /snow|sleet|hail|freezing/.test(weather);
+  const wet = snowy || /rain|pour|lightning/.test(weather);
+  let headline, items, icon;
+  if (value <= -5) {
+    headline = 'Riktigt kallt ute'; items = ['Vinteroverall', 'Varm mössa och vantar', 'Varma stövlar']; icon = 'snow';
+  } else if (value <= 3) {
+    headline = 'Kallt ute'; items = ['Varm jacka', 'Mössa och vantar', 'Rejäla skor']; icon = snowy ? 'snow' : 'jacket';
+  } else if (value <= 10) {
+    headline = 'Svalt ute'; items = ['Jacka eller tjock tröja', 'Långbyxor', 'Skor som tål lek']; icon = 'jacket';
+  } else if (value <= 17) {
+    headline = 'Lagom ute'; items = ['Tunn jacka eller tröja', 'Långa byxor', 'Vanliga skor']; icon = 'shirt';
+  } else {
+    headline = 'Varmt ute'; items = ['T-shirt eller tunn tröja', 'Lätta kläder', 'Keps i stark sol']; icon = 'sun';
+  }
+  if (wet) {
+    items = ['Regnjacka', snowy ? 'Varma vattentäta stövlar' : 'Stövlar eller vattentäta skor', ...items.slice(0,1)];
+    headline = snowy ? 'Blött och vinterväder' : 'Regnigt ute'; icon = snowy ? 'snow' : 'rain';
+  }
+  return {headline, items, icon};
+}
 // Legacy selections stay visible alongside the unified entity list, without duplicates.
 export function homeSensorIds(config = {}) {
   return [...new Set([...(config.home_sensor_entities || []), ...(config.temperature_entities || []), ...(config.lock_entities || [])])];

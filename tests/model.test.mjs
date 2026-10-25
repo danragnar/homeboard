@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {finite,temperatureMean,priceIntervals,priceSummary,priceBand,lockSummary,sceneStatus,esc} from '../custom_components/homeboard_tv/frontend/model.mjs';
+import {finite,temperatureMean,priceIntervals,priceSummary,priceBand,lockSummary,sceneStatus,dressingAdvice,esc} from '../custom_components/homeboard_tv/frontend/model.mjs';
 const s=(state,unit='°C')=>({state,attributes:{unit_of_measurement:unit}});
 test('Missing values remain missing; zero remains valid',()=>{
  for(const input of [null,undefined,'',' ','unknown','unavailable',Infinity]) assert.equal(finite(input),null);
@@ -47,6 +47,12 @@ test('Scenes only claim active when an explicit tracking helper is on',()=>{
  assert.equal(sceneStatus(states,{entity:'scene.a',active_entity:'binary_sensor.missing'}),'Status unavailable');
 });
 test('Entity names are escaped before rendering',()=>assert.equal(esc('<img src=x onerror="x">'), '&lt;img src=x onerror=&quot;x&quot;&gt;'));
+test('Dressing advice is child-friendly and prioritises wet weather',()=>{
+ assert.deepEqual(dressingAdvice(20,'sunny').items,['T-shirt eller tunn tröja','Lätta kläder','Keps i stark sol']);
+ assert.deepEqual(dressingAdvice(8,'rainy').items,['Regnjacka','Stövlar eller vattentäta skor','Jacka eller tjock tröja']);
+ assert.match(dressingAdvice(-7,'snowy').headline,/Blött/);
+ assert.equal(dressingAdvice(null).headline,'Kolla vädret först');
+});
 
 test('Calendar events preserve all-day dates, exclude ended events and sort/limit upcoming items',async()=>{
  const {calendarEvents}=await import('../custom_components/homeboard_tv/frontend/model.mjs');
